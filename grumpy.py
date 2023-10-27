@@ -78,6 +78,8 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 23.10.27    Added to gitlab
+
 Version 23.09.27    Added AppendFEmaps() to append two femi maps. It comes with restrictions...
 
 Version 23.08.06    Moved fwhm() from myRay.py to here.
@@ -122,7 +124,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.09.27"
+__version__ = "23.10.27"
 __author__  = "Mats Leandersson"
 
 
