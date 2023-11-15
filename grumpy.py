@@ -60,6 +60,8 @@ Main methods:
     xps()               Not a method but a class, containing binding energies for elements.
 
     SortP()             (Loader for general data not covered by the types listed above. A work in progress. Slow work, slow progress.)
+    
+    MakeArithmetic()    Makes an object out of a Grumpy dict which can handle arithmetic operations. Applies to non-spin data.
 
 More methods (not applicapble on grumpy dicts):
     fitGauss()          Fit a gaussian.
@@ -77,6 +79,9 @@ Notes:
 --- 
 
 Version history (from 23.05.15 and onwards):
+
+Version 23.11.15    Added a method (MakeArithmetic) to make an objectc out of a Grumpy dict that can handle arithmetic operations.
+                    Does not apply to spin data (yet).
 
 Version 23.10.27    Added to gitlab
 
@@ -124,7 +129,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.10.27"
+__version__ = "23.11.15"
 __author__  = "Mats Leandersson"
 
 
@@ -2766,7 +2771,221 @@ def Smooth(D = {}, method = '', **kwargs):
 
         
     
+# ==============================================================================================
+# ==============================================================================================
+# ==============================================================================================
+# ==============================================================================================
 
+class MakeArithmetic():
+    """
+    Make a Grumpy dict into an object which you can perform arithmetic operation on, plus
+    a few other stuff, like plotting. The axes and intensity are:
+        self.x      (3d, 2d, 1d)
+        self.y      (3d, 2d)
+        self.z      (3d)
+        self.int    (3d, 2d, 1d)
+        
+    Operators: 
+        +, -, *, /, <, >, <=, >=
+        
+    Methods: 
+        plot()  Plots 1d, and 2d data
+                Optional arguments:
+                    ax          as matplotlib.axes._axes.Axes
+                    figsize     as tuple,eg (3,3) 
+                    aspect      as "auto" or "equal"
+                    vmin, vmax  as numbers or None
+                    cbar        as boolean, adds a colorbar
+                    cmap        as str or None, colormap e.g "bone_r", "bwr", "hot", "rainbow", ...
+                    
+        
+    """
+    def __init__(self, d = {}):
+        """"""
+        if not type(d) is dict:
+            print(Fore.RED + "Argument d must be a Grumpy dict." + Fore.BLACK)
+            return
+        #
+        dm = 0
+        axis = d.get("x", np.zeros([0]))
+        if len(axis) > 0:
+            self.x = axis
+            dm += 1
+        axis = d.get("y", np.zeros([0]))
+        if len(axis) > 0:
+            self.y = axis
+            dm += 1
+        axis = d.get("z", np.zeros([0]))
+        if len(axis) > 0:
+            self.z = axis
+            dm += 1
+        if dm == 0:
+            print(Fore.RED + "Did not find any axes in the dict." + Fore.BLACK)
+        intensity = d.get("int", None)
+        if type(intensity) is type(None):
+            print(Fore.RED + "Did not find an intensity array in the dict." + Fore.BLACK)
+            return
+        self.int = intensity
+        if dm == 0: return
+        #
+        idim = len(np.shape(intensity))
+        if not dm == idim:
+            print(Fore.RED + f"The number of axes ({dm}) does not match the dimension of the intensity array ({idim})." + Fore.BLACK)
+            return
+        #
+        if dm == 1:
+            if not len(self.x) == np.shape(intensity)[0]:
+                print(Fore.RED + f"The length of the axis ({len(self.x)}) does not match the length of the intensity array ({np.shape(intensity)[0]})." + Fore.BLACK)
+                return
+        elif dm == 2:
+            if not len(self.x) == np.shape(intensity)[1] or not len(self.y) == np.shape(intensity)[0]:
+                print(Fore.RED + f"The lengths of the axes ({len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.BLACK)
+                return
+        elif dm == 3:
+            if not len(self.x) == np.shape(intensity)[2] or not len(self.y) == np.shape(intensity)[1] or not len(self.z) == np.shape(intensity)[0]:
+                print(Fore.RED + f"The lengths of the axes ({len(self.z)},{len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.BLACK)
+                return
+    
+    # --------------- operators -----------------
+    
+    def __add__(self, o):
+        ret = copy.deepcopy(self)
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret.int = ret.int + o.int
+        elif type(o) is int or type(o) is float:
+            ret.int = ret.int + o
+        else:
+            print(Fore.RED + "The + operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def __sub__(self, o):
+        ret = copy.deepcopy(self)
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret.int = ret.int - o.int
+        elif type(o) is int or type(o) is float:
+            ret.int = ret.int - o
+        else:
+            print(Fore.RED + "The - operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def __mul__(self, o):
+        ret = copy.deepcopy(self)
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret.int = ret.int * o.int
+        elif type(o) is int or type(o) is float:
+            ret.int = ret.int * o
+        else:
+            print(Fore.RED + "The * operator only acts on same type (element-wise), float, and int." + Fore.BLACK)
+        return ret
+    
+    def __truediv__(self, o):
+        ret = copy.deepcopy(self)
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret.int = ret.int / o.int
+        elif type(o) is int or type(o) is float:
+            ret.int = ret.int / o
+        else:
+            print(Fore.RED + "The / operator only acts on same type (element-wise), float, and int." + Fore.BLACK)
+        return ret
+    
+    def __lt__(self, o): # less than
+        ret = False
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret = self.int.sum() < o.int.sum()
+        elif type(o) is int or type(o) is float:
+            ret = self.int.sum() < o
+        else:
+            print(Fore.RED + "The < operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def __gt__(self, o): # greater than
+        ret = False
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret = self.int.sum() > o.int.sum()
+        elif type(o) is int or type(o) is float:
+            ret = self.int.sum() > o
+        else:
+            print(Fore.RED + "The > operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def __le__(self, o): # less or equal than
+        ret = False
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret = self.int.sum() <= o.int.sum()
+        elif type(o) is int or type(o) is float:
+            ret = self.int.sum() <= o
+        else:
+            print(Fore.RED + "The <= operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def __ge__(self, o): # less or greater than
+        ret = False
+        if type(o) is type(self):
+            if self._check_other_object(o):
+                ret = self.int.sum() >= o.int.sum()
+        elif type(o) is int or type(o) is float:
+            ret = self.int.sum() >= o
+        else:
+            print(Fore.RED + "The >= operator only acts on same type, float, and int." + Fore.BLACK)
+        return ret
+    
+    def _check_other_object(self, o):
+        try:
+            oshape = np.shape(o.int)
+        except:
+            print(Fore.RED + "The data in the 2nd object is of unknown type." + Fore.BLACK)
+            return False
+        if not oshape == np.shape(self.int):
+            print(Fore.RED + "The data in the objects are not of the same size and/or dimentsion." + Fore.BLACK)
+            return False
+        return True
+    
+    # --------------- plot -----------------
+    
+    def plot(self, ax = None, figsize = (3,3), aspect = "equal", vmin = None, vmax = None, cbar = False, cmap = None):
+        try:
+            idim = len(np.shape(self.int))
+        except:
+            print(Fore.RED + "There is no intensity data." + Fore.BLACK)
+            return ax
+        if idim == 0:
+            print(Fore.RED + "There is no intensity data." + Fore.BLACK)
+            return ax
+        if not idim in [1, 2]:
+            print(Fore.RED + "I'm not plotting data of higher dimension than 2." + Fore.BLACK)
+            return ax
+        #
+        if type(ax) is type(None):
+            fig, ax = plt.subplots(figsize = figsize)
+        #
+        if idim == 1:
+            ax.plot(self.x, self.int, linewidth = 0.75, color = "k")
+            ax.set_xlabel("x"); ax.set_ylabel("intensity")
+        elif idim == 2:
+            extent = [self.y[0], self.y[-1], self.x[-1], self.x[0]]
+            ims = ax.imshow(np.transpose(self.int), extent = extent, aspect = aspect, vmin = vmin, vmax = vmax, cmap = cmap)
+            ax.invert_yaxis()
+            if cbar:
+                _ = plt.colorbar(ims, ax = ax)
+        #
+        return ax
+    
+    
+            
+            
+    
+        
+        
+            
+            
+        
 
             
             
@@ -2954,1156 +3173,3 @@ def AppendFEmaps(data1 = {}, data2 = {}, shup = False):
 
 
 
-# ============================================================================================================
-# ============================================================================================================
-# ============================================================================================================
-# ============================================================================================================
-
-class xps():
-    """
-    Class containing binding energies for the elements.
-
-    Methods to use:
-
-    Element() or E():           Pass argument 'element' to list binding energies.
-
-    KineticEnergy() or Ek():    Pass arguments 'ek' and 'hv' to list possible elements.
-                                Argument 'delta' defines the search window. Argument
-                                'order' defines how many orders of hv to search within.
-                                Argument filter is a list of elements that limits the search.
-    
-    BindingEnergy() or Eb():    Pass argument 'eb' to list binding energies within the energy
-                                window defined by argument 'delta'. Argument 'filter' is a
-                                list of elements that limits the search.
-    
-    """
-    def __init__(self, shup = False):
-        if not shup:
-            print(Fore.BLUE)
-            print("Use .Element() to search for binding energies for an element, .KineticEnergy() to search")
-            print("for element binding energies close to a kinetic energy, and .BindingEnergy() to search for")
-            print("element binding energies close to a binding energy.")
-            print(Fore.MAGENTA + "Credit: All binding energy values comes from Pesto by Craig Polley.")
-            print(Fore.BLACK)
-        self._make_table()
-        self.elements = np.unique(np.transpose(self.xps_table)[1])
-
-
-    def Element(self, element = 'none'):
-        """
-        Argument: element as a string, e.g. element = 'Au' lists all binding energies for element Au.
-        """
-        result = []
-        if element in self.elements:
-            for i, e in enumerate(self.xps_table):
-                if e[1] == element: result.append(self.xps_table[i])
-        else:
-            if element == 'none':
-                print(Fore.RED + "Pass argument element.".format(element) + Fore.BLACK)
-            else:
-                print(Fore.RED + "Element '{0}' is not in the list.".format(element) + Fore.BLACK)
-            return
-        for row in result:
-            if row[3] == 's': row4 = '   '
-            else: row4 = row[4]
-            print("{0:<2}   {1:<2}   {2:<1}{3:<1}   {4:<3}  {5:7.1f}".format(row[0], row[1], row[2], row[3], row4, row[5]))
-
-    def KineticEnergy(self, ek = None, hv = None, delta = 5, wf = 4.5, order = 4, filter = []):
-        """
-        Arguments:  ek as number (kinetic energy), non-optional
-                    hv as number (photon energy), non-optional
-                    delta as number (energy window) 
-                    wf as number (analyzer work function)
-                    order as integer (highest order to include)
-                    filter as list of strings (filter out elements from the search)
-        
-        Prints binding energy levels corresponding to the kinetic energy (within a range set by argument delta).
-        """
-        if type(ek) is type(None) or type(hv) is type(None):
-            print(Fore.RED + "Arguments ek and hv must be numbers." + Fore.BLACK)
-            return
-        result = []
-        orders = list(range(1,order+1))
-        result_orders = []
-        for i, element in enumerate(self.xps_table):
-            Eb_tab = float(element[5])
-            for order in orders:
-                Eb = order * hv - ek - wf
-                if Eb_tab - delta <= Eb and Eb <= Eb_tab + delta:
-                    append = True
-                    if len(filter) > 0:
-                        if not element[1] in filter:
-                            append = False
-                    if append:
-                        result.append(self.xps_table[i])
-                        result_orders.append(order)
-        if len(result) == 0:
-            print(Fore.RED + "Could not find any matching results for {0} < Ek < {1}.".format(ek - delta/2, ek + delta/2) + Fore.BLACK)
-            return
-        for i, row in enumerate(result):
-            if row[3] == 's': row4 = '   '
-            else: row4 = row[4]
-            if result_orders[i] == 1: ord = ''
-            else: ord = result_orders[i]
-            print("{0:<2}   {1:<2}   {2:<1}{3:<1}   {4:<3}  {5:6.1f}   {6}".format(row[0], row[1], row[2], row[3], row4, row[5], ord))
-
-    def BindingEnergy(self, eb = None, delta = 5, filter = []):
-        """
-        Arguments:  eb as number (binding energy)
-                    delta as number (energy window)
-                    filter as list of strings (filter out elements from the search)
-        """
-        if type(eb) is type(None) or type(delta) is type(None):
-            print(Fore.RED + "Arguments eb and delta must be numbers." + Fore.BLACK)
-            return
-        result = []
-        for i, element in enumerate(self.xps_table):
-            if (eb - delta/2) <= element[5] and element[5] <= (eb + delta/2):
-                append = True
-                if len(filter) > 0:
-                    if not element[1] in filter:
-                        append = False
-                if append:
-                    result.append(element)
-        if len(result) == 0:
-            print(Fore.RED + "Could not find any matching results for {0} < Eb < {1}.".format(eb - delta/2, eb + delta/2) + Fore.BLACK)
-            return
-        for i, row in enumerate(result):
-            if row[3] == 's': row4 = '   '
-            else: row4 = row[4]
-            print("{0:<2}   {1:<2}   {2:<1}{3:<1}   {4:<3}  {5:6.1f}".format(row[0], row[1], row[2], row[3], row4, row[5]))
-
-    def E(self, element = 'none'):
-        self.Element(element = element)
-    
-    def Ek(self, ek = None, hv = None, delta = 5, wf = 4.5, order = 4, filter = []):
-        self.KineticEnergy(ek = ek, hv = hv, delta = delta, wf = wf, order = order, filter = filter)
-    
-    def Eb(self, eb = None, delta = 5, filter = []):
-        self.BindingEnergy(self, eb = eb, delta = delta, filter = filter)
-    
-
-    def _make_table(self):
-        xps_table=[]
-
-        xps_table.append([3, 'Li', '1', 's', '0', 54.7])
-        xps_table.append([4, 'Be', '1', 's', '0', 111.5])
-        xps_table.append([5, 'B', '1', 's', '0', 188])
-        xps_table.append([6, 'C', '1', 's', '0', 284.2])
-        xps_table.append([7, 'N', '1', 's', '0', 409.9])
-        xps_table.append([7, 'N', '2', 's', '0', 37.3])
-        xps_table.append([8, 'O', '1', 's', '0', 543.1])
-        xps_table.append([8, 'O', '2', 's', '0', 41.6])
-        xps_table.append([9, 'F', '1', 's', '0', 696.7])
-        xps_table.append([10, 'Ne', '1', 's', '0', 870.2])
-        xps_table.append([10, 'Ne', '2', 's', '0', 48.5])
-        xps_table.append([10, 'Ne', '2', 'p', '1/2', 21.7])
-        xps_table.append([10, 'Ne', '2', 'p', '3/2', 21.6])
-
-
-        xps_table.append([11, 'Na', '1', 's', '0', 1070.8])
-        xps_table.append([11, 'Na', '2', 's', '0', 63.5])
-        xps_table.append([11, 'Na', '2', 'p', '1/2', 30.4])
-        xps_table.append([11, 'Na', '2', 'p', '3/2', 30.5])
-        xps_table.append([12, 'Mg', '1', 's', '0', 1303.0])
-        xps_table.append([12, 'Mg', '2', 's', '0', 88.6])
-        xps_table.append([12, 'Mg', '2', 'p', '1/2', 49.6])
-        xps_table.append([12, 'Mg', '2', 'p', '3/2', 49.2])
-        xps_table.append([13, 'Al', '1', 's', '0', 1559.0])
-        xps_table.append([13, 'Al', '2', 's', '0', 117.8])
-        xps_table.append([13, 'Al', '2', 'p', '1/2', 72.9])
-        xps_table.append([13, 'Al', '2', 'p', '3/2', 72.5])
-        xps_table.append([14, 'Si', '1', 's', '0', 1839.0])
-        xps_table.append([14, 'Si', '2', 's', '0', 149.7])
-        xps_table.append([14, 'Si', '2', 'p', '1/2', 99.8])
-        xps_table.append([14, 'Si', '2', 'p', '3/2', 99.2])
-        xps_table.append([15, 'P', '1', 's', '0', 2145.5])
-        xps_table.append([15, 'P', '2', 's', '0', 189.0])
-        xps_table.append([15, 'P', '2', 'p', '1/2', 136.0])
-        xps_table.append([15, 'P', '2', 'p', '3/2', 135.0])
-        xps_table.append([16, 'S', '1', 's', '0', 2472.0])
-        xps_table.append([16, 'S', '2', 's', '0', 230.9])
-        xps_table.append([16, 'S', '2', 'p', '1/2', 163.6])
-        xps_table.append([16, 'S', '2', 'p', '3/2', 162.5])
-        xps_table.append([17, 'Cl', '1', 's', '0', 2822])
-        xps_table.append([17, 'Cl', '2', 's', '0', 270])
-        xps_table.append([17, 'Cl', '2', 'p', '1/2', 202])
-        xps_table.append([17, 'Cl', '2', 'p', '3/2', 200])
-        xps_table.append([18, 'Ar', '1', 's', '0', 3205.9])
-        xps_table.append([18, 'Ar', '2', 's', '0', 326.3])
-        xps_table.append([18, 'Ar', '2', 'p', '1/2', 250.6])
-        xps_table.append([18, 'Ar', '2', 'p', '3/2', 248.4])
-        xps_table.append([18, 'Ar', '3', 's', '0', 29.3])
-        xps_table.append([18, 'Ar', '3', 'p', '1/2', 15.9])
-        xps_table.append([18, 'Ar', '3', 'p', '3/2', 15.7])
-
-
-        xps_table.append([19, 'K', '1', 's', '0', 3608.4])
-        xps_table.append([19, 'K', '2', 's', '0', 378.6])
-        xps_table.append([19, 'K', '2', 'p', '1/2', 297.3])
-        xps_table.append([19, 'K', '2', 'p', '3/2', 294.6])
-        xps_table.append([19, 'K', '3', 's', '0', 34.8])
-        xps_table.append([19, 'K', '3', 'p', '1/2', 18.3])
-        xps_table.append([19, 'K', '3', 'p', '3/2', 18.3])
-        xps_table.append([20, 'Ca', '1', 's', '0', 4038.5])
-        xps_table.append([20, 'Ca', '2', 's', '0', 438.4])
-        xps_table.append([20, 'Ca', '2', 'p', '1/2', 349.7])
-        xps_table.append([20, 'Ca', '2', 'p', '3/2', 346.2])
-        xps_table.append([20, 'Ca', '3', 's', '0', 44.3])
-        xps_table.append([20, 'Ca', '3', 'p', '1/2', 25.4])
-        xps_table.append([20, 'Ca', '3', 'p', '3/2', 25.4])
-        xps_table.append([21, 'Sc', '1', 's', '0', 4492])
-        xps_table.append([21, 'Sc', '2', 's', '0', 498])
-        xps_table.append([21, 'Sc', '2', 'p', '1/2', 403.6])
-        xps_table.append([21, 'Sc', '2', 'p', '3/2', 398.7])
-        xps_table.append([21, 'Sc', '3', 's', '0', 51.1])
-        xps_table.append([21, 'Sc', '3', 'p', '1/2', 28.3])
-        xps_table.append([21, 'Sc', '3', 'p', '3/2', 28.3])
-        xps_table.append([22, 'Ti', '1', 's', '0', 4966])
-        xps_table.append([22, 'Ti', '2', 's', '0', 560.9])
-        xps_table.append([22, 'Ti', '2', 'p', '1/2', 460.2])
-        xps_table.append([22, 'Ti', '2', 'p', '3/2', 453.8])
-        xps_table.append([22, 'Ti', '3', 's', '0', 58.7])
-        xps_table.append([22, 'Ti', '3', 'p', '1/2', 32.6])
-        xps_table.append([22, 'Ti', '3', 'p', '3/2', 32.6])
-        xps_table.append([23, 'V', '1', 's', '0', 5465])
-        xps_table.append([23, 'V', '2', 's', '0', 626.7])
-        xps_table.append([23, 'V', '2', 'p', '1/2', 519.8])
-        xps_table.append([23, 'V', '2', 'p', '3/2', 512.1])
-        xps_table.append([23, 'V', '3', 's', '0', 66.3])
-        xps_table.append([23, 'V', '3', 'p', '1/2', 37.2])
-        xps_table.append([23, 'V', '3', 'p', '3/2', 37.2])
-        xps_table.append([24, 'Cr', '1', 's', '0', 5989])
-        xps_table.append([24, 'Cr', '2', 's', '0', 696])
-        xps_table.append([24, 'Cr', '2', 'p', '1/2', 583.8])
-        xps_table.append([24, 'Cr', '2', 'p', '3/2', 574.1])
-        xps_table.append([24, 'Cr', '3', 's', '0', 74.1])
-        xps_table.append([24, 'Cr', '3', 'p', '1/2', 42.2])
-        xps_table.append([24, 'Cr', '3', 'p', '3/2', 42.2])
-        xps_table.append([25, 'Mn', '1', 's', '0', 6539])
-        xps_table.append([25, 'Mn', '2', 's', '0', 769.1])
-        xps_table.append([25, 'Mn', '2', 'p', '1/2', 649.9])
-        xps_table.append([25, 'Mn', '2', 'p', '3/2', 638.7])
-        xps_table.append([25, 'Mn', '3', 's', '0', 82.3])
-        xps_table.append([25, 'Mn', '3', 'p', '1/2', 47.2])
-        xps_table.append([25, 'Mn', '3', 'p', '3/2', 47.2])
-        xps_table.append([26, 'Fe', '1', 's', '0', 7112])
-        xps_table.append([26, 'Fe', '2', 's', '0', 844.6])
-        xps_table.append([26, 'Fe', '2', 'p', '1/2', 719.9])
-        xps_table.append([26, 'Fe', '2', 'p', '3/2', 706.8])
-        xps_table.append([26, 'Fe', '3', 's', '0', 91.3])
-        xps_table.append([26, 'Fe', '3', 'p', '1/2', 52.7])
-        xps_table.append([26, 'Fe', '3', 'p', '3/2', 52.7])
-        xps_table.append([27, 'Co', '1', 's', '0', 7709])
-        xps_table.append([27, 'Co', '2', 's', '0', 925.1])
-        xps_table.append([27, 'Co', '2', 'p', '1/2', 793.2])
-        xps_table.append([27, 'Co', '2', 'p', '3/2', 778.1])
-        xps_table.append([27, 'Co', '3', 's', '0', 101])
-        xps_table.append([27, 'Co', '3', 'p', '1/2', 58.9])
-        xps_table.append([27, 'Co', '3', 'p', '3/2', 59.9])
-        xps_table.append([28, 'Ni', '1', 's', '0', 8333])
-        xps_table.append([28, 'Ni', '2', 's', '0', 1008.6])
-        xps_table.append([28, 'Ni', '2', 'p', '1/2', 870])
-        xps_table.append([28, 'Ni', '2', 'p', '3/2', 852.7])
-        xps_table.append([28, 'Ni', '3', 's', '0', 110.8])
-        xps_table.append([28, 'Ni', '3', 'p', '1/2', 68])
-        xps_table.append([28, 'Ni', '3', 'p', '3/2', 66.2])
-        xps_table.append([29, 'Cu', '1', 's', '0', 8979])
-        xps_table.append([29, 'Cu', '2', 's', '0', 1096.7])
-        xps_table.append([29, 'Cu', '2', 'p', '1/2', 952.3])
-        xps_table.append([29, 'Cu', '2', 'p', '3/2', 932.7])
-        xps_table.append([29, 'Cu', '3', 's', '0', 122.5])
-        xps_table.append([29, 'Cu', '3', 'p', '1/2', 77.3])
-        xps_table.append([29, 'Cu', '3', 'p', '3/2', 75.1])
-        xps_table.append([30, 'Zn', '1', 's', '0', 9659])
-        xps_table.append([30, 'Zn', '2', 's', '0', 1196.2])
-        xps_table.append([30, 'Zn', '2', 'p', '1/2', 1044.9])
-        xps_table.append([30, 'Zn', '2', 'p', '3/2', 1021.8])
-        xps_table.append([30, 'Zn', '3', 's', '0', 139.8])
-        xps_table.append([30, 'Zn', '3', 'p', '1/2', 91.4])
-        xps_table.append([30, 'Zn', '3', 'p', '3/2', 88.6])
-        xps_table.append([30, 'Zn', '3', 'd', '3/2', 10.2])
-        xps_table.append([30, 'Zn', '3', 'd', '5/2', 10.1])
-        xps_table.append([31, 'Ga', '1', 's', '0', 10367])
-        xps_table.append([31, 'Ga', '2', 's', '0', 1299])
-        xps_table.append([31, 'Ga', '2', 'p', '1/2', 1143.2])
-        xps_table.append([31, 'Ga', '2', 'p', '3/2', 1116.4])
-        xps_table.append([31, 'Ga', '3', 's', '0', 159.5])
-        xps_table.append([31, 'Ga', '3', 'p', '1/2', 103.5])
-        xps_table.append([31, 'Ga', '3', 'p', '3/2', 100])
-        xps_table.append([31, 'Ga', '3', 'd', '3/2', 18.7])
-        xps_table.append([31, 'Ga', '3', 'd', '5/2', 18.7])
-        xps_table.append([32, 'Ge', '1', 's', '0', 11103])
-        xps_table.append([32, 'Ge', '2', 's', '0', 1414.6])
-        xps_table.append([32, 'Ge', '2', 'p', '1/2', 1248.1])
-        xps_table.append([32, 'Ge', '2', 'p', '3/2', 1217])
-        xps_table.append([32, 'Ge', '3', 's', '0', 180.1])
-        xps_table.append([32, 'Ge', '3', 'p', '1/2', 124.9])
-        xps_table.append([32, 'Ge', '3', 'p', '3/2', 120.8])
-        xps_table.append([32, 'Ge', '3', 'd', '3/2', 29.8])
-        xps_table.append([32, 'Ge', '3', 'd', '5/2', 29.2])
-        xps_table.append([33, 'As', '1', 's', '0', 11867])
-        xps_table.append([33, 'As', '2', 's', '0', 1527])
-        xps_table.append([33, 'As', '2', 'p', '1/2', 1359.1])
-        xps_table.append([33, 'As', '2', 'p', '3/2', 1323.6])
-        xps_table.append([33, 'As', '3', 's', '0', 204.7])
-        xps_table.append([33, 'As', '3', 'p', '1/2', 146.2])
-        xps_table.append([33, 'As', '3', 'p', '3/2', 141.2])
-        xps_table.append([33, 'As', '3', 'd', '3/2', 41.7])
-        xps_table.append([33, 'As', '3', 'd', '5/2', 41.7])
-        xps_table.append([34, 'Se', '1', 's', '0', 12658])
-        xps_table.append([34, 'Se', '2', 's', '0', 1652])
-        xps_table.append([34, 'Se', '2', 'p', '1/2', 1474.3])
-        xps_table.append([34, 'Se', '2', 'p', '3/2', 1433.9])
-        xps_table.append([34, 'Se', '3', 's', '0', 229.6])
-        xps_table.append([34, 'Se', '3', 'p', '1/2', 166.5])
-        xps_table.append([34, 'Se', '3', 'p', '3/2', 160.7])
-        xps_table.append([34, 'Se', '3', 'd', '3/2', 55.5])
-        xps_table.append([34, 'Se', '3', 'd', '5/2', 54.6])
-        xps_table.append([35, 'Br', '1', 's', '0', 13474])
-        xps_table.append([35, 'Br', '2', 's', '0', 1782])
-        xps_table.append([35, 'Br', '2', 'p', '1/2', 1596])
-        xps_table.append([35, 'Br', '2', 'p', '3/2', 1550])
-        xps_table.append([35, 'Br', '3', 's', '0', 257])
-        xps_table.append([35, 'Br', '3', 'p', '1/2', 189])
-        xps_table.append([35, 'Br', '3', 'p', '3/2', 182])
-        xps_table.append([35, 'Br', '3', 'd', '3/2', 70])
-        xps_table.append([35, 'Br', '3', 'd', '5/2', 69])
-        xps_table.append([36, 'Kr', '1', 's', '0', 14326])
-        xps_table.append([36, 'Kr', '2', 's', '0', 1921])
-        xps_table.append([36, 'Kr', '2', 'p', '1/2', 1730.9])
-        xps_table.append([36, 'Kr', '2', 'p', '3/2', 1678.4])
-        xps_table.append([36, 'Kr', '3', 's', '0', 292.8])
-        xps_table.append([36, 'Kr', '3', 'p', '1/2', 222.2])
-        xps_table.append([36, 'Kr', '3', 'p', '3/2', 214.4])
-        xps_table.append([36, 'Kr', '3', 'd', '3/2', 95])
-        xps_table.append([36, 'Kr', '3', 'd', '5/2', 93.8])
-        xps_table.append([36, 'Kr', '4', 's', '0', 27.5])
-        xps_table.append([36, 'Kr', '4', 'p', '1/2', 14.1])
-        xps_table.append([36, 'Kr', '4', 'p', '3/2', 14.1])
-
-
-        xps_table.append([37, 'Rb', '1', 's', '0', 15200])
-        xps_table.append([37, 'Rb', '2', 's', '0', 2065])
-        xps_table.append([37, 'Rb', '2', 'p', '1/2', 1864])
-        xps_table.append([37, 'Rb', '2', 'p', '3/2', 1804])
-        xps_table.append([37, 'Rb', '3', 's', '0', 326.7])
-        xps_table.append([37, 'Rb', '3', 'p', '1/2', 248.7])
-        xps_table.append([37, 'Rb', '3', 'p', '3/2', 239.1])
-        xps_table.append([37, 'Rb', '3', 'd', '3/2', 113])
-        xps_table.append([37, 'Rb', '3', 'd', '5/2', 112])
-        xps_table.append([37, 'Rb', '4', 's', '0', 30.5])
-        xps_table.append([37, 'Rb', '4', 'p', '1/2', 16.3])
-        xps_table.append([37, 'Rb', '4', 'p', '3/2', 15.3])
-
-        xps_table.append([38, 'Sr', '1', 's', '0', 16105])
-        xps_table.append([38, 'Sr', '2', 's', '0', 2216])
-        xps_table.append([38, 'Sr', '2', 'p', '1/2', 2007])
-        xps_table.append([38, 'Sr', '2', 'p', '3/2', 1940])
-        xps_table.append([38, 'Sr', '3', 's', '0', 358.7])
-        xps_table.append([38, 'Sr', '3', 'p', '1/2', 280.3])
-        xps_table.append([38, 'Sr', '3', 'p', '3/2', 270])
-        xps_table.append([38, 'Sr', '3', 'd', '3/2', 136])
-        xps_table.append([38, 'Sr', '3', 'd', '5/2', 134.2])
-        xps_table.append([38, 'Sr', '4', 's', '0', 38.9])
-        xps_table.append([38, 'Sr', '4', 'p', '1/2', 21.6])
-        xps_table.append([38, 'Sr', '4', 'p', '3/2', 20.1])
-
-        xps_table.append([39, 'Y', '1', 's', '0', 17038])
-        xps_table.append([39, 'Y', '2', 's', '0', 2373])
-        xps_table.append([39, 'Y', '2', 'p', '1/2', 2156])
-        xps_table.append([39, 'Y', '2', 'p', '3/2', 2080])
-        xps_table.append([39, 'Y', '3', 's', '0', 392])
-        xps_table.append([39, 'Y', '3', 'p', '1/2', 310.6])
-        xps_table.append([39, 'Y', '3', 'p', '3/2', 298.8])
-        xps_table.append([39, 'Y', '3', 'd', '3/2', 157.7])
-        xps_table.append([39, 'Y', '3', 'd', '5/2', 155.8])
-        xps_table.append([39, 'Y', '4', 's', '0', 43.8])
-        xps_table.append([39, 'Y', '4', 'p', '1/2', 24.4])
-        xps_table.append([39, 'Y', '4', 'p', '3/2', 23.1])
-
-        xps_table.append([40, 'Zr', '1', 's', '0', 17998])
-        xps_table.append([40, 'Zr', '2', 's', '0', 2532])
-        xps_table.append([40, 'Zr', '2', 'p', '1/2', 2307])
-        xps_table.append([40, 'Zr', '2', 'p', '3/2', 2223])
-        xps_table.append([40, 'Zr', '3', 's', '0', 430.3])
-        xps_table.append([40, 'Zr', '3', 'p', '1/2', 343.5])
-        xps_table.append([40, 'Zr', '3', 'p', '3/2', 329.8])
-        xps_table.append([40, 'Zr', '3', 'd', '3/2', 181.1])
-        xps_table.append([40, 'Zr', '3', 'd', '5/2', 178.8])
-        xps_table.append([40, 'Zr', '4', 's', '0', 50.6])
-        xps_table.append([40, 'Zr', '4', 'p', '1/2', 28.5])
-        xps_table.append([40, 'Zr', '4', 'p', '3/2', 27.1])
-
-        xps_table.append([41, 'Nb', '1', 's', '0', 18986])
-        xps_table.append([41, 'Nb', '2', 's', '0', 2698])
-        xps_table.append([41, 'Nb', '2', 'p', '1/2', 2465])
-        xps_table.append([41, 'Nb', '2', 'p', '3/2', 2371])
-        xps_table.append([41, 'Nb', '3', 's', '0', 466.6])
-        xps_table.append([41, 'Nb', '3', 'p', '1/2', 376.1])
-        xps_table.append([41, 'Nb', '3', 'p', '3/2', 360.6])
-        xps_table.append([41, 'Nb', '3', 'd', '3/2', 205])
-        xps_table.append([41, 'Nb', '3', 'd', '5/2', 202.3])
-        xps_table.append([41, 'Nb', '4', 's', '0', 56.4])
-        xps_table.append([41, 'Nb', '4', 'p', '1/2', 32.6])
-        xps_table.append([41, 'Nb', '4', 'p', '3/2', 30.8])
-
-        xps_table.append([42, 'Mo', '1', 's', '0', 20000])
-        xps_table.append([42, 'Mo', '2', 's', '0', 2866])
-        xps_table.append([42, 'Mo', '2', 'p', '1/2', 2625])
-        xps_table.append([42, 'Mo', '2', 'p', '3/2', 2520])
-        xps_table.append([42, 'Mo', '3', 's', '0', 506.3])
-        xps_table.append([42, 'Mo', '3', 'p', '1/2', 411.6])
-        xps_table.append([42, 'Mo', '3', 'p', '3/2', 394])
-        xps_table.append([42, 'Mo', '3', 'd', '3/2', 231.1])
-        xps_table.append([42, 'Mo', '3', 'd', '5/2', 227.9])
-        xps_table.append([42, 'Mo', '4', 's', '0', 63.2])
-        xps_table.append([42, 'Mo', '4', 'p', '1/2', 37.6])
-        xps_table.append([42, 'Mo', '4', 'p', '3/2', 35.5])
-
-        xps_table.append([43, 'Tc', '1', 's', '0', 21044])
-        xps_table.append([43, 'Tc', '2', 's', '0', 3043])
-        xps_table.append([43, 'Tc', '2', 'p', '1/2', 2793])
-        xps_table.append([43, 'Tc', '2', 'p', '3/2', 2677])
-        xps_table.append([43, 'Tc', '3', 's', '0', 544])
-        xps_table.append([43, 'Tc', '3', 'p', '1/2', 447.6])
-        xps_table.append([43, 'Tc', '3', 'p', '3/2', 417.7])
-        xps_table.append([43, 'Tc', '3', 'd', '3/2', 257.6])
-        xps_table.append([43, 'Tc', '3', 'd', '5/2', 253.9])
-        xps_table.append([43, 'Tc', '4', 's', '0', 69.5])
-        xps_table.append([43, 'Tc', '4', 'p', '1/2', 42.3])
-        xps_table.append([43, 'Tc', '4', 'p', '3/2', 39.9])
-
-        xps_table.append([44, 'Ru', '1', 's', '0', 22117])
-        xps_table.append([44, 'Ru', '2', 's', '0', 3224])
-        xps_table.append([44, 'Ru', '2', 'p', '1/2', 2967])
-        xps_table.append([44, 'Ru', '2', 'p', '3/2', 2838])
-        xps_table.append([44, 'Ru', '3', 's', '0', 586.1])
-        xps_table.append([44, 'Ru', '3', 'p', '1/2', 483.3])
-        xps_table.append([44, 'Ru', '3', 'p', '3/2', 461.5])
-        xps_table.append([44, 'Ru', '3', 'd', '3/2', 284.2])
-        xps_table.append([44, 'Ru', '3', 'd', '5/2', 280])
-        xps_table.append([44, 'Ru', '4', 's', '0', 75])
-        xps_table.append([44, 'Ru', '4', 'p', '1/2', 46.3])
-        xps_table.append([44, 'Ru', '4', 'p', '3/2', 43.2])
-
-        xps_table.append([45, 'Rh', '1', 's', '0', 23220])
-        xps_table.append([45, 'Rh', '2', 's', '0', 3412])
-        xps_table.append([45, 'Rh', '2', 'p', '1/2', 3146])
-        xps_table.append([45, 'Rh', '2', 'p', '3/2', 3004])
-        xps_table.append([45, 'Rh', '3', 's', '0', 628.1])
-        xps_table.append([45, 'Rh', '3', 'p', '1/2', 521.3])
-        xps_table.append([45, 'Rh', '3', 'p', '3/2', 496.5])
-        xps_table.append([45, 'Rh', '3', 'd', '3/2', 311.9])
-        xps_table.append([45, 'Rh', '3', 'd', '5/2', 307.2])
-        xps_table.append([45, 'Rh', '4', 's', '0', 81.4])
-        xps_table.append([45, 'Rh', '4', 'p', '1/2', 50.5])
-        xps_table.append([45, 'Rh', '4', 'p', '3/2', 47.3])
-
-        xps_table.append([46, 'Pd', '1', 's', '0', 24350])
-        xps_table.append([46, 'Pd', '2', 's', '0', 3604])
-        xps_table.append([46, 'Pd', '2', 'p', '1/2', 3330])
-        xps_table.append([46, 'Pd', '2', 'p', '3/2', 3173])
-        xps_table.append([46, 'Pd', '3', 's', '0', 671.6])
-        xps_table.append([46, 'Pd', '3', 'p', '1/2', 559.9])
-        xps_table.append([46, 'Pd', '3', 'p', '3/2', 532.3])
-        xps_table.append([46, 'Pd', '3', 'd', '3/2', 340.5])
-        xps_table.append([46, 'Pd', '3', 'd', '5/2', 335.2])
-        xps_table.append([46, 'Pd', '4', 's', '0', 87.1])
-        xps_table.append([46, 'Pd', '4', 'p', '1/2', 55.7])
-        xps_table.append([46, 'Pd', '4', 'p', '3/2', 50.9])
-
-        xps_table.append([47, 'Ag', '1', 's', '0', 25514])
-        xps_table.append([47, 'Ag', '2', 's', '0', 3806])
-        xps_table.append([47, 'Ag', '2', 'p', '1/2', 3524])
-        xps_table.append([47, 'Ag', '2', 'p', '3/2', 3351])
-        xps_table.append([47, 'Ag', '3', 's', '0', 719])
-        xps_table.append([47, 'Ag', '3', 'p', '1/2', 603.8])
-        xps_table.append([47, 'Ag', '3', 'p', '3/2', 573])
-        xps_table.append([47, 'Ag', '3', 'd', '3/2', 374])
-        xps_table.append([47, 'Ag', '3', 'd', '5/2', 368.3])
-        xps_table.append([47, 'Ag', '4', 's', '0', 97])
-        xps_table.append([47, 'Ag', '4', 'p', '1/2', 63.7])
-        xps_table.append([47, 'Ag', '4', 'p', '3/2', 58.3])
-
-        xps_table.append([48, 'Cd', '1', 's', '0', 26711])
-        xps_table.append([48, 'Cd', '2', 's', '0', 4018])
-        xps_table.append([48, 'Cd', '2', 'p', '1/2', 3727])
-        xps_table.append([48, 'Cd', '2', 'p', '3/2', 3538])
-        xps_table.append([48, 'Cd', '3', 's', '0', 772])
-        xps_table.append([48, 'Cd', '3', 'p', '1/2', 652.6])
-        xps_table.append([48, 'Cd', '3', 'p', '3/2', 618.4])
-        xps_table.append([48, 'Cd', '3', 'd', '3/2', 411.9])
-        xps_table.append([48, 'Cd', '3', 'd', '5/2', 405.2])
-        xps_table.append([48, 'Cd', '4', 's', '0', 109.8])
-        xps_table.append([48, 'Cd', '4', 'p', '1/2', 63.9])
-        xps_table.append([48, 'Cd', '4', 'p', '3/2', 63.9])
-        xps_table.append([48, 'Cd', '4', 'd', '3/2', 11.7])
-        xps_table.append([48, 'Cd', '4', 'd', '5/2', 10.7])
-
-        xps_table.append([49, 'In', '1', 's', '0', 27940])
-        xps_table.append([49, 'In', '2', 's', '0', 4238])
-        xps_table.append([49, 'In', '2', 'p', '1/2', 3938])
-        xps_table.append([49, 'In', '2', 'p', '3/2', 3730])
-        xps_table.append([49, 'In', '3', 's', '0', 827.2])
-        xps_table.append([49, 'In', '3', 'p', '1/2', 703.2])
-        xps_table.append([49, 'In', '3', 'p', '3/2', 665.3])
-        xps_table.append([49, 'In', '3', 'd', '3/2', 451.4])
-        xps_table.append([49, 'In', '3', 'd', '5/2', 443.9])
-        xps_table.append([49, 'In', '4', 's', '0', 122.9])
-        xps_table.append([49, 'In', '4', 'p', '1/2', 73.5])
-        xps_table.append([49, 'In', '4', 'p', '3/2', 73.5])
-        xps_table.append([49, 'In', '4', 'd', '3/2', 17.7])
-        xps_table.append([49, 'In', '4', 'd', '5/2', 16.9])
-
-        xps_table.append([50, 'Sn', '1', 's', '0', 29200])
-        xps_table.append([50, 'Sn', '2', 's', '0', 4465])
-        xps_table.append([50, 'Sn', '2', 'p', '1/2', 4156])
-        xps_table.append([50, 'Sn', '2', 'p', '3/2', 3929])
-        xps_table.append([50, 'Sn', '3', 's', '0', 884.7])
-        xps_table.append([50, 'Sn', '3', 'p', '1/2', 756.5])
-        xps_table.append([50, 'Sn', '3', 'p', '3/2', 714.6])
-        xps_table.append([50, 'Sn', '3', 'd', '3/2', 493.2])
-        xps_table.append([50, 'Sn', '3', 'd', '5/2', 484.9])
-        xps_table.append([50, 'Sn', '4', 's', '0', 137.1])
-        xps_table.append([50, 'Sn', '4', 'p', '1/2', 83.6])
-        xps_table.append([50, 'Sn', '4', 'p', '3/2', 83.6])
-        xps_table.append([50, 'Sn', '4', 'd', '3/2', 24.9])
-        xps_table.append([50, 'Sn', '4', 'd', '5/2', 23.9])
-
-        xps_table.append([51, 'Sb', '1', 's', '0', 30491])
-        xps_table.append([51, 'Sb', '2', 's', '0', 4698])
-        xps_table.append([51, 'Sb', '2', 'p', '1/2', 4380])
-        xps_table.append([51, 'Sb', '2', 'p', '3/2', 4132])
-        xps_table.append([51, 'Sb', '3', 's', '0', 940])
-        xps_table.append([51, 'Sb', '3', 'p', '1/2', 812.7])
-        xps_table.append([51, 'Sb', '3', 'p', '3/2', 766.4])
-        xps_table.append([51, 'Sb', '3', 'd', '3/2', 537.5])
-        xps_table.append([51, 'Sb', '3', 'd', '5/2', 528.2])
-        xps_table.append([51, 'Sb', '4', 's', '0', 153.2])
-        xps_table.append([51, 'Sb', '4', 'p', '1/2', 95.6])
-        xps_table.append([51, 'Sb', '4', 'p', '3/2', 95.6])
-        xps_table.append([51, 'Sb', '4', 'd', '3/2', 33.3])
-        xps_table.append([51, 'Sb', '4', 'd', '5/2', 32.1])
-
-        xps_table.append([52, 'Te', '1', 's', '0', 31814])
-        xps_table.append([52, 'Te', '2', 's', '0', 4939])
-        xps_table.append([52, 'Te', '2', 'p', '1/2', 4612])
-        xps_table.append([52, 'Te', '2', 'p', '3/2', 4341])
-        xps_table.append([52, 'Te', '3', 's', '0', 1006])
-        xps_table.append([52, 'Te', '3', 'p', '1/2', 870.8])
-        xps_table.append([52, 'Te', '3', 'p', '3/2', 820.8])
-        xps_table.append([52, 'Te', '3', 'd', '3/2', 583.4])
-        xps_table.append([52, 'Te', '3', 'd', '5/2', 573])
-        xps_table.append([52, 'Te', '4', 's', '0', 169.4])
-        xps_table.append([52, 'Te', '4', 'p', '1/2', 103.3])
-        xps_table.append([52, 'Te', '4', 'p', '3/2', 103.3])
-        xps_table.append([52, 'Te', '4', 'd', '3/2', 41.9])
-        xps_table.append([52, 'Te', '4', 'd', '5/2', 40.4])
-
-        xps_table.append([53, 'I', '1', 's', '0', 33169])
-        xps_table.append([53, 'I', '2', 's', '0', 5188])
-        xps_table.append([53, 'I', '2', 'p', '1/2', 4852])
-        xps_table.append([53, 'I', '2', 'p', '3/2', 4557])
-        xps_table.append([53, 'I', '3', 's', '0', 1072])
-        xps_table.append([53, 'I', '3', 'p', '1/2', 931])
-        xps_table.append([53, 'I', '3', 'p', '3/2', 875])
-        xps_table.append([53, 'I', '3', 'd', '3/2', 630.8])
-        xps_table.append([53, 'I', '3', 'd', '5/2', 619.3])
-        xps_table.append([53, 'I', '4', 's', '0', 186])
-        xps_table.append([53, 'I', '4', 'p', '1/2', 123])
-        xps_table.append([53, 'I', '4', 'p', '3/2', 123])
-        xps_table.append([53, 'I', '4', 'd', '3/2', 50.6])
-        xps_table.append([53, 'I', '4', 'd', '5/2', 48.9])
-
-        xps_table.append([54, 'Xe', '1', 's', '0', 34561])
-        xps_table.append([54, 'Xe', '2', 's', '0', 5453])
-        xps_table.append([54, 'Xe', '2', 'p', '1/2', 5107])
-        xps_table.append([54, 'Xe', '2', 'p', '3/2', 4786])
-        xps_table.append([54, 'Xe', '3', 's', '0', 1148.7])
-        xps_table.append([54, 'Xe', '3', 'p', '1/2', 1002.1])
-        xps_table.append([54, 'Xe', '3', 'p', '3/2', 940.6])
-        xps_table.append([54, 'Xe', '3', 'd', '3/2', 689])
-        xps_table.append([54, 'Xe', '3', 'd', '5/2', 676.4])
-        xps_table.append([54, 'Xe', '4', 's', '0', 213.2])
-        xps_table.append([54, 'Xe', '4', 'p', '1/2', 146.7])
-        xps_table.append([54, 'Xe', '4', 'p', '3/2', 145.5])
-        xps_table.append([54, 'Xe', '4', 'd', '3/2', 69.5])
-        xps_table.append([54, 'Xe', '4', 'd', '5/2', 67.5])
-        xps_table.append([54, 'Xe', '5', 's', '0', 23.3])
-        xps_table.append([54, 'Xe', '5', 'p', '1/2', 13.4])
-        xps_table.append([54, 'Xe', '5', 'p', '3/2', 12.1])
-
-
-        xps_table.append([55, 'Cs', '1', 's', '0', 35985])
-        xps_table.append([55, 'Cs', '2', 's', '0', 5714])
-        xps_table.append([55, 'Cs', '2', 'p', '1/2', 5359])
-        xps_table.append([55, 'Cs', '2', 'p', '3/2', 5012])
-        xps_table.append([55, 'Cs', '3', 's', '0', 1211])
-        xps_table.append([55, 'Cs', '3', 'p', '1/2', 1071])
-        xps_table.append([55, 'Cs', '3', 'p', '3/2', 1003])
-        xps_table.append([55, 'Cs', '3', 'd', '3/2', 740.5])
-        xps_table.append([55, 'Cs', '3', 'd', '5/2', 726.6])
-        xps_table.append([55, 'Cs', '4', 's', '0', 232.3])
-        xps_table.append([55, 'Cs', '4', 'p', '1/2', 172.4])
-        xps_table.append([55, 'Cs', '4', 'p', '3/2', 161.3])
-        xps_table.append([55, 'Cs', '4', 'd', '3/2', 79.8])
-        xps_table.append([55, 'Cs', '4', 'd', '5/2', 77.5])
-        xps_table.append([55, 'Cs', '5', 's', '0', 22.7])
-        xps_table.append([55, 'Cs', '5', 'p', '1/2', 14.2])
-        xps_table.append([55, 'Cs', '5', 'p', '3/2', 12.1])
-
-        xps_table.append([56, 'Ba', '1', 's', '0', 37441])
-        xps_table.append([56, 'Ba', '2', 's', '0', 5989])
-        xps_table.append([56, 'Ba', '2', 'p', '1/2', 5624])
-        xps_table.append([56, 'Ba', '2', 'p', '3/2', 5247])
-        xps_table.append([56, 'Ba', '3', 's', '0', 1293])
-        xps_table.append([56, 'Ba', '3', 'p', '1/2', 1137])
-        xps_table.append([56, 'Ba', '3', 'p', '3/2', 1063])
-        xps_table.append([56, 'Ba', '3', 'd', '3/2', 795.7])
-        xps_table.append([56, 'Ba', '3', 'd', '5/2', 780.5])
-        xps_table.append([56, 'Ba', '4', 's', '0', 253.5])
-        xps_table.append([56, 'Ba', '4', 'p', '1/2', 192])
-        xps_table.append([56, 'Ba', '4', 'p', '3/2', 178.6])
-        xps_table.append([56, 'Ba', '4', 'd', '3/2', 92.6])
-        xps_table.append([56, 'Ba', '4', 'd', '5/2', 89.9])
-        xps_table.append([56, 'Ba', '5', 's', '0', 30.3])
-        xps_table.append([56, 'Ba', '5', 'p', '1/2', 17])
-        xps_table.append([56, 'Ba', '5', 'p', '3/2', 14.8])
-
-        xps_table.append([57, 'La', '1', 's', '0', 38925])
-        xps_table.append([57, 'La', '2', 's', '0', 6266])
-        xps_table.append([57, 'La', '2', 'p', '1/2', 5891])
-        xps_table.append([57, 'La', '2', 'p', '3/2', 5483])
-        xps_table.append([57, 'La', '3', 's', '0', 1362])
-        xps_table.append([57, 'La', '3', 'p', '1/2', 1209])
-        xps_table.append([57, 'La', '3', 'p', '3/2', 1128])
-        xps_table.append([57, 'La', '3', 'd', '3/2', 853])
-        xps_table.append([57, 'La', '3', 'd', '5/2', 836])
-        xps_table.append([57, 'La', '4', 's', '0', 274.7])
-        xps_table.append([57, 'La', '4', 'p', '1/2', 205.8])
-        xps_table.append([57, 'La', '4', 'p', '3/2', 196])
-        xps_table.append([57, 'La', '4', 'd', '3/2', 105.3])
-        xps_table.append([57, 'La', '4', 'd', '5/2', 102.5])
-        xps_table.append([57, 'La', '5', 's', '0', 34.3])
-        xps_table.append([57, 'La', '5', 'p', '1/2', 19.3])
-        xps_table.append([57, 'La', '5', 'p', '3/2', 16.8])
-
-        xps_table.append([58, 'Ce', '1', 's', '0', 40443])
-        xps_table.append([58, 'Ce', '2', 's', '0', 6548])
-        xps_table.append([58, 'Ce', '2', 'p', '1/2', 6164])
-        xps_table.append([58, 'Ce', '2', 'p', '3/2', 5723])
-        xps_table.append([58, 'Ce', '3', 's', '0', 1436])
-        xps_table.append([58, 'Ce', '3', 'p', '1/2', 1274])
-        xps_table.append([58, 'Ce', '3', 'p', '3/2', 1187])
-        xps_table.append([58, 'Ce', '3', 'd', '3/2', 902.4])
-        xps_table.append([58, 'Ce', '3', 'd', '5/2', 883.8])
-        xps_table.append([58, 'Ce', '4', 's', '0', 291])
-        xps_table.append([58, 'Ce', '4', 'p', '1/2', 223.2])
-        xps_table.append([58, 'Ce', '4', 'p', '3/2', 206.5])
-        xps_table.append([58, 'Ce', '4', 'd', '3/2', 109])
-        xps_table.append([58, 'Ce', '4', 'f', '5/2', 0.1])
-        xps_table.append([58, 'Ce', '4', 'f', '7/2', 0.1])
-        xps_table.append([58, 'Ce', '5', 's', '0', 37.8])
-        xps_table.append([58, 'Ce', '5', 'p', '1/2', 19.8])
-        xps_table.append([58, 'Ce', '5', 'p', '3/2', 17])
-
-        xps_table.append([59, 'Pr', '1', 's', '0', 41991])
-        xps_table.append([59, 'Pr', '2', 's', '0', 6835])
-        xps_table.append([59, 'Pr', '2', 'p', '1/2', 6440])
-        xps_table.append([59, 'Pr', '2', 'p', '3/2', 5964])
-        xps_table.append([59, 'Pr', '3', 's', '0', 1511])
-        xps_table.append([59, 'Pr', '3', 'p', '1/2', 1337])
-        xps_table.append([59, 'Pr', '3', 'p', '3/2', 1242])
-        xps_table.append([59, 'Pr', '3', 'd', '3/2', 948.3])
-        xps_table.append([59, 'Pr', '3', 'd', '5/2', 928.8])
-        xps_table.append([59, 'Pr', '4', 's', '0', 304.5])
-        xps_table.append([59, 'Pr', '4', 'p', '1/2', 236.3])
-        xps_table.append([59, 'Pr', '4', 'p', '3/2', 217.6])
-        xps_table.append([59, 'Pr', '4', 'd', '3/2', 115.1])
-        xps_table.append([59, 'Pr', '4', 'd', '5/2', 115.1])
-        xps_table.append([59, 'Pr', '4', 'f', '5/2', 2])
-        xps_table.append([59, 'Pr', '4', 'f', '7/2', 2])
-        xps_table.append([59, 'Pr', '5', 's', '0', 37.4])
-        xps_table.append([59, 'Pr', '5', 'p', '1/2', 22.3])
-        xps_table.append([59, 'Pr', '5', 'p', '3/2', 22.3])
-
-        xps_table.append([60, 'Nd', '1', 's', '0', 43569])
-        xps_table.append([60, 'Nd', '2', 's', '0', 7126])
-        xps_table.append([60, 'Nd', '2', 'p', '1/2', 6722])
-        xps_table.append([60, 'Nd', '2', 'p', '3/2', 6208])
-        xps_table.append([60, 'Nd', '3', 's', '0', 1575])
-        xps_table.append([60, 'Nd', '3', 'p', '1/2', 1403])
-        xps_table.append([60, 'Nd', '3', 'p', '3/2', 1297])
-        xps_table.append([60, 'Nd', '3', 'd', '3/2', 1003.3])
-        xps_table.append([60, 'Nd', '3', 'd', '5/2', 980.4])
-        xps_table.append([60, 'Nd', '4', 's', '0', 319.2])
-        xps_table.append([60, 'Nd', '4', 'p', '1/2', 243.3])
-        xps_table.append([60, 'Nd', '4', 'p', '3/2', 224.6])
-        xps_table.append([60, 'Nd', '4', 'd', '3/2', 120.5])
-        xps_table.append([60, 'Nd', '4', 'd', '5/2', 120.5])
-        xps_table.append([60, 'Nd', '4', 'f', '5/2', 1.5])
-        xps_table.append([60, 'Nd', '4', 'f', '7/2', 1.5])
-        xps_table.append([60, 'Nd', '5', 's', '0', 37.5])
-        xps_table.append([60, 'Nd', '5', 'p', '1/2', 21.1])
-        xps_table.append([60, 'Nd', '5', 'p', '3/2', 21.1])
-
-        xps_table.append([61, 'Pm', '1', 's', '0', 45184])
-        xps_table.append([61, 'Pm', '2', 's', '0', 7428])
-        xps_table.append([61, 'Pm', '2', 'p', '1/2', 7013])
-        xps_table.append([61, 'Pm', '2', 'p', '3/2', 6459])
-        xps_table.append([61, 'Pm', '3', 'p', '1/2', 1471.4])
-        xps_table.append([61, 'Pm', '3', 'p', '3/2', 1357])
-        xps_table.append([61, 'Pm', '3', 'd', '3/2', 1052])
-        xps_table.append([61, 'Pm', '3', 'd', '5/2', 1027])
-        xps_table.append([61, 'Pm', '4', 'p', '1/2', 242])
-        xps_table.append([61, 'Pm', '4', 'p', '3/2', 242])
-        xps_table.append([61, 'Pm', '4', 'd', '3/2', 120])
-        xps_table.append([61, 'Pm', '4', 'd', '5/2', 120])
-
-        xps_table.append([62, 'Sm', '1', 's', '0', 46834])
-        xps_table.append([62, 'Sm', '2', 's', '0', 7737])
-        xps_table.append([62, 'Sm', '2', 'p', '1/2', 7312])
-        xps_table.append([62, 'Sm', '2', 'p', '3/2', 6716])
-        xps_table.append([62, 'Sm', '3', 's', '0', 1723])
-        xps_table.append([62, 'Sm', '3', 'p', '1/2', 1541])
-        xps_table.append([62, 'Sm', '3', 'p', '3/2', 1419.8])
-        xps_table.append([62, 'Sm', '3', 'd', '3/2', 1110.9])
-        xps_table.append([62, 'Sm', '3', 'd', '5/2', 1083.4])
-        xps_table.append([62, 'Sm', '4', 's', '0', 347.2])
-        xps_table.append([62, 'Sm', '4', 'p', '1/2', 265.6])
-        xps_table.append([62, 'Sm', '4', 'p', '3/2', 247.4])
-        xps_table.append([62, 'Sm', '4', 'd', '3/2', 129])
-        xps_table.append([62, 'Sm', '4', 'd', '5/2', 129])
-        xps_table.append([62, 'Sm', '4', 'f', '5/2', 5.2])
-        xps_table.append([62, 'Sm', '4', 'f', '7/2', 5.2])
-        xps_table.append([62, 'Sm', '5', 's', '0', 37.4])
-        xps_table.append([62, 'Sm', '5', 'p', '1/2', 21.3])
-        xps_table.append([62, 'Sm', '5', 'p', '3/2', 21.3])
-
-        xps_table.append([63, 'Eu', '1', 's', '0', 48519])
-        xps_table.append([63, 'Eu', '2', 's', '0', 8052])
-        xps_table.append([63, 'Eu', '2', 'p', '1/2', 7617])
-        xps_table.append([63, 'Eu', '2', 'p', '3/2', 6977])
-        xps_table.append([63, 'Eu', '3', 's', '0', 1800])
-        xps_table.append([63, 'Eu', '3', 'p', '1/2', 1614])
-        xps_table.append([63, 'Eu', '3', 'p', '3/2', 1481])
-        xps_table.append([63, 'Eu', '3', 'd', '3/2', 1158.6])
-        xps_table.append([63, 'Eu', '3', 'd', '5/2', 1127.5])
-        xps_table.append([63, 'Eu', '4', 's', '0', 360])
-        xps_table.append([63, 'Eu', '4', 'p', '1/2', 284])
-        xps_table.append([63, 'Eu', '4', 'p', '3/2', 257])
-        xps_table.append([63, 'Eu', '4', 'd', '3/2', 133])
-        xps_table.append([63, 'Eu', '4', 'd', '5/2', 127.7])
-        xps_table.append([63, 'Eu', '4', 'f', '5/2', 0])
-        xps_table.append([63, 'Eu', '4', 'f', '7/2', 0])
-        xps_table.append([63, 'Eu', '5', 's', '0', 32])
-        xps_table.append([63, 'Eu', '5', 'p', '1/2', 22])
-        xps_table.append([63, 'Eu', '5', 'p', '3/2', 22])
-
-        xps_table.append([64, 'Gd', '1', 's', '0', 50239])
-        xps_table.append([64, 'Gd', '2', 's', '0', 8376])
-        xps_table.append([64, 'Gd', '2', 'p', '1/2', 7930])
-        xps_table.append([64, 'Gd', '2', 'p', '3/2', 7243])
-        xps_table.append([64, 'Gd', '3', 's', '0', 1881])
-        xps_table.append([64, 'Gd', '3', 'p', '1/2', 1688])
-        xps_table.append([64, 'Gd', '3', 'p', '3/2', 1544])
-        xps_table.append([64, 'Gd', '3', 'd', '3/2', 1221.9])
-        xps_table.append([64, 'Gd', '3', 'd', '5/2', 1189.6])
-        xps_table.append([64, 'Gd', '4', 's', '0', 378.6])
-        xps_table.append([64, 'Gd', '4', 'p', '1/2', 286])
-        xps_table.append([64, 'Gd', '4', 'p', '3/2', 271])
-        xps_table.append([64, 'Gd', '4', 'd', '5/2', 142.6])
-        xps_table.append([64, 'Gd', '4', 'f', '5/2', 8.6])
-        xps_table.append([64, 'Gd', '4', 'f', '7/2', 8.6])
-        xps_table.append([64, 'Gd', '5', 's', '0', 36])
-        xps_table.append([64, 'Gd', '5', 'p', '1/2', 20])
-        xps_table.append([64, 'Gd', '5', 'p', '3/2', 20])
-
-        xps_table.append([65, 'Tb', '1', 's', '0', 51996])
-        xps_table.append([65, 'Tb', '2', 's', '0', 8708])
-        xps_table.append([65, 'Tb', '2', 'p', '1/2', 8252])
-        xps_table.append([65, 'Tb', '2', 'p', '3/2', 7514])
-        xps_table.append([65, 'Tb', '3', 's', '0', 1968])
-        xps_table.append([65, 'Tb', '3', 'p', '1/2', 1768])
-        xps_table.append([65, 'Tb', '3', 'p', '3/2', 1611])
-        xps_table.append([65, 'Tb', '3', 'd', '3/2', 1276.9])
-        xps_table.append([65, 'Tb', '3', 'd', '5/2', 1241.1])
-        xps_table.append([65, 'Tb', '4', 's', '0', 396])
-        xps_table.append([65, 'Tb', '4', 'p', '1/2', 322.4])
-        xps_table.append([65, 'Tb', '4', 'p', '3/2', 284.1])
-        xps_table.append([65, 'Tb', '4', 'd', '3/2', 150.5])
-        xps_table.append([65, 'Tb', '4', 'd', '5/2', 150.5])
-        xps_table.append([65, 'Tb', '4', 'f', '5/2', 7.7])
-        xps_table.append([65, 'Tb', '4', 'f', '7/2', 2.4])
-        xps_table.append([65, 'Tb', '5', 's', '0', 45.6])
-        xps_table.append([65, 'Tb', '5', 'p', '1/2', 28.7])
-        xps_table.append([65, 'Tb', '5', 'p', '3/2', 22.6])
-
-        xps_table.append([66, 'Dy', '1', 's', '0', 53789])
-        xps_table.append([66, 'Dy', '2', 's', '0', 9046])
-        xps_table.append([66, 'Dy', '2', 'p', '1/2', 8581])
-        xps_table.append([66, 'Dy', '2', 'p', '3/2', 7790])
-        xps_table.append([66, 'Dy', '3', 's', '0', 2047])
-        xps_table.append([66, 'Dy', '3', 'p', '1/2', 1842])
-        xps_table.append([66, 'Dy', '3', 'p', '3/2', 1676])
-        xps_table.append([66, 'Dy', '3', 'd', '3/2', 1333])
-        xps_table.append([66, 'Dy', '3', 'd', '5/2', 1292])
-        xps_table.append([66, 'Dy', '4', 's', '0', 414.2])
-        xps_table.append([66, 'Dy', '4', 'p', '1/2', 333.5])
-        xps_table.append([66, 'Dy', '4', 'p', '3/2', 293.2])
-        xps_table.append([66, 'Dy', '4', 'd', '3/2', 153.6])
-        xps_table.append([66, 'Dy', '4', 'd', '5/2', 153.6])
-        xps_table.append([66, 'Dy', '4', 'f', '5/2', 8])
-        xps_table.append([66, 'Dy', '4', 'f', '7/2', 4.3])
-        xps_table.append([66, 'Dy', '5', 's', '0', 49.9])
-        xps_table.append([66, 'Dy', '5', 'p', '1/2', 26.3])
-        xps_table.append([66, 'Dy', '5', 'p', '3/2', 26.3])
-
-        xps_table.append([67, 'Ho', '1', 's', '0', 55618])
-        xps_table.append([67, 'Ho', '2', 's', '0', 9394])
-        xps_table.append([67, 'Ho', '2', 'p', '1/2', 8918])
-        xps_table.append([67, 'Ho', '2', 'p', '3/2', 8071])
-        xps_table.append([67, 'Ho', '3', 's', '0', 2128])
-        xps_table.append([67, 'Ho', '3', 'p', '1/2', 1923])
-        xps_table.append([67, 'Ho', '3', 'p', '3/2', 1741])
-        xps_table.append([67, 'Ho', '3', 'd', '3/2', 1392])
-        xps_table.append([67, 'Ho', '3', 'd', '5/2', 1351])
-        xps_table.append([67, 'Ho', '4', 's', '0', 432.4])
-        xps_table.append([67, 'Ho', '4', 'p', '1/2', 343.5])
-        xps_table.append([67, 'Ho', '4', 'p', '3/2', 308.2])
-        xps_table.append([67, 'Ho', '4', 'd', '3/2', 160])
-        xps_table.append([67, 'Ho', '4', 'd', '5/2', 160])
-        xps_table.append([67, 'Ho', '4', 'f', '5/2', 8.6])
-        xps_table.append([67, 'Ho', '4', 'f', '7/2', 5.2])
-        xps_table.append([67, 'Ho', '5', 's', '0', 49.3])
-        xps_table.append([67, 'Ho', '5', 'p', '1/2', 30.8])
-        xps_table.append([67, 'Ho', '5', 'p', '3/2', 24.1])
-
-        xps_table.append([68, 'Er', '1', 's', '0', 57486])
-        xps_table.append([68, 'Er', '2', 's', '0', 9751])
-        xps_table.append([68, 'Er', '2', 'p', '1/2', 9264])
-        xps_table.append([68, 'Er', '2', 'p', '3/2', 8358])
-        xps_table.append([68, 'Er', '3', 's', '0', 2206])
-        xps_table.append([68, 'Er', '3', 'p', '1/2', 2006])
-        xps_table.append([68, 'Er', '3', 'p', '3/2', 1812])
-        xps_table.append([68, 'Er', '3', 'd', '3/2', 1453])
-        xps_table.append([68, 'Er', '3', 'd', '5/2', 1409])
-        xps_table.append([68, 'Er', '4', 's', '0', 449.8])
-        xps_table.append([68, 'Er', '4', 'p', '1/2', 366.2])
-        xps_table.append([68, 'Er', '4', 'p', '3/2', 320.2])
-        xps_table.append([68, 'Er', '4', 'd', '3/2', 167.6])
-        xps_table.append([68, 'Er', '4', 'd', '5/2', 167.6])
-        xps_table.append([68, 'Er', '4', 'f', '7/2', 4.7])
-        xps_table.append([68, 'Er', '5', 's', '0', 50.6])
-        xps_table.append([68, 'Er', '5', 'p', '1/2', 31.4])
-        xps_table.append([68, 'Er', '5', 'p', '3/2', 24.7])
-
-        xps_table.append([69, 'Tm', '1', 's', '0', 59390])
-        xps_table.append([69, 'Tm', '2', 's', '0', 10116])
-        xps_table.append([69, 'Tm', '2', 'p', '1/2', 9617])
-        xps_table.append([69, 'Tm', '2', 'p', '3/2', 8648])
-        xps_table.append([69, 'Tm', '3', 's', '0', 2307])
-        xps_table.append([69, 'Tm', '3', 'p', '1/2', 2090])
-        xps_table.append([69, 'Tm', '3', 'p', '3/2', 1885])
-        xps_table.append([69, 'Tm', '3', 'd', '3/2', 1515])
-        xps_table.append([69, 'Tm', '3', 'd', '5/2', 1468])
-        xps_table.append([69, 'Tm', '4', 's', '0', 470.9])
-        xps_table.append([69, 'Tm', '4', 'p', '1/2', 385.9])
-        xps_table.append([69, 'Tm', '4', 'p', '3/2', 332.6])
-        xps_table.append([69, 'Tm', '4', 'd', '3/2', 175.5])
-        xps_table.append([69, 'Tm', '4', 'd', '5/2', 175.5])
-        xps_table.append([69, 'Tm', '4', 'f', '7/2', 4.6])
-        xps_table.append([69, 'Tm', '5', 's', '0', 54.7])
-        xps_table.append([69, 'Tm', '5', 'p', '1/2', 31.8])
-        xps_table.append([69, 'Tm', '5', 'p', '3/2', 25])
-
-        xps_table.append([70, 'Yb', '1', 's', '0', 61332])
-        xps_table.append([70, 'Yb', '2', 's', '0', 10486])
-        xps_table.append([70, 'Yb', '2', 'p', '1/2', 9978])
-        xps_table.append([70, 'Yb', '2', 'p', '3/2', 8944])
-        xps_table.append([70, 'Yb', '3', 's', '0', 2398])
-        xps_table.append([70, 'Yb', '3', 'p', '1/2', 2173])
-        xps_table.append([70, 'Yb', '3', 'p', '3/2', 1950])
-        xps_table.append([70, 'Yb', '3', 'd', '3/2', 1576])
-        xps_table.append([70, 'Yb', '3', 'd', '5/2', 1528])
-        xps_table.append([70, 'Yb', '4', 's', '0', 480.5])
-        xps_table.append([70, 'Yb', '4', 'p', '1/2', 388.7])
-        xps_table.append([70, 'Yb', '4', 'p', '3/2', 339.7])
-        xps_table.append([70, 'Yb', '4', 'd', '3/2', 191.2])
-        xps_table.append([70, 'Yb', '4', 'd', '5/2', 182.4])
-        xps_table.append([70, 'Yb', '4', 'f', '5/2', 2.5])
-        xps_table.append([70, 'Yb', '4', 'f', '7/2', 1.3])
-        xps_table.append([70, 'Yb', '5', 's', '0', 52])
-        xps_table.append([70, 'Yb', '5', 'p', '1/2', 30.3])
-        xps_table.append([70, 'Yb', '5', 'p', '3/2', 24.1])
-
-        xps_table.append([71, 'Lu', '1', 's', '0', 63314])
-        xps_table.append([71, 'Lu', '2', 's', '0', 10870])
-        xps_table.append([71, 'Lu', '2', 'p', '1/2', 10349])
-        xps_table.append([71, 'Lu', '2', 'p', '3/2', 9244])
-        xps_table.append([71, 'Lu', '3', 's', '0', 2491])
-        xps_table.append([71, 'Lu', '3', 'p', '1/2', 2264])
-        xps_table.append([71, 'Lu', '3', 'p', '3/2', 2024])
-        xps_table.append([71, 'Lu', '3', 'd', '3/2', 1639])
-        xps_table.append([71, 'Lu', '3', 'd', '5/2', 1589])
-        xps_table.append([71, 'Lu', '4', 's', '0', 506.8])
-        xps_table.append([71, 'Lu', '4', 'p', '1/2', 412.4])
-        xps_table.append([71, 'Lu', '4', 'p', '3/2', 359.2])
-        xps_table.append([71, 'Lu', '4', 'd', '3/2', 206.1])
-        xps_table.append([71, 'Lu', '4', 'd', '5/2', 196.3])
-        xps_table.append([71, 'Lu', '4', 'f', '5/2', 8.9])
-        xps_table.append([71, 'Lu', '4', 'f', '7/2', 7.5])
-        xps_table.append([71, 'Lu', '5', 's', '0', 57.3])
-        xps_table.append([71, 'Lu', '5', 'p', '1/2', 33.6])
-        xps_table.append([71, 'Lu', '5', 'p', '3/2', 26.7])
-
-        xps_table.append([72, 'Hf', '1', 's', '0', 65351])
-        xps_table.append([72, 'Hf', '2', 's', '0', 11271])
-        xps_table.append([72, 'Hf', '2', 'p', '1/2', 10739])
-        xps_table.append([72, 'Hf', '2', 'p', '3/2', 9561])
-        xps_table.append([72, 'Hf', '3', 's', '0', 2601])
-        xps_table.append([72, 'Hf', '3', 'p', '1/2', 2365])
-        xps_table.append([72, 'Hf', '3', 'p', '3/2', 2107])
-        xps_table.append([72, 'Hf', '3', 'd', '3/2', 1716])
-        xps_table.append([72, 'Hf', '3', 'd', '5/2', 1662])
-        xps_table.append([72, 'Hf', '4', 's', '0', 538])
-        xps_table.append([72, 'Hf', '4', 'p', '1/2', 438.2])
-        xps_table.append([72, 'Hf', '4', 'p', '3/2', 380.7])
-        xps_table.append([72, 'Hf', '4', 'd', '3/2', 220])
-        xps_table.append([72, 'Hf', '4', 'd', '5/2', 211.5])
-        xps_table.append([72, 'Hf', '4', 'f', '5/2', 15.9])
-        xps_table.append([72, 'Hf', '4', 'f', '7/2', 14.2])
-        xps_table.append([72, 'Hf', '5', 's', '0', 64.2])
-        xps_table.append([72, 'Hf', '5', 'p', '1/2', 38])
-        xps_table.append([72, 'Hf', '5', 'p', '3/2', 29.9])
-
-        xps_table.append([73, 'Ta', '1', 's', '0', 67416])
-        xps_table.append([73, 'Ta', '2', 's', '0', 11682])
-        xps_table.append([73, 'Ta', '2', 'p', '1/2', 11136])
-        xps_table.append([73, 'Ta', '2', 'p', '3/2', 9881])
-        xps_table.append([73, 'Ta', '3', 's', '0', 2708])
-        xps_table.append([73, 'Ta', '3', 'p', '1/2', 2469])
-        xps_table.append([73, 'Ta', '3', 'p', '3/2', 2194])
-        xps_table.append([73, 'Ta', '3', 'd', '3/2', 1793])
-        xps_table.append([73, 'Ta', '3', 'd', '5/2', 1735])
-        xps_table.append([73, 'Ta', '4', 's', '0', 563.4])
-        xps_table.append([73, 'Ta', '4', 'p', '1/2', 463.4])
-        xps_table.append([73, 'Ta', '4', 'p', '3/2', 400.9])
-        xps_table.append([73, 'Ta', '4', 'd', '3/2', 237.9])
-        xps_table.append([73, 'Ta', '4', 'd', '5/2', 226.4])
-        xps_table.append([73, 'Ta', '4', 'f', '5/2', 23.5])
-        xps_table.append([73, 'Ta', '4', 'f', '7/2', 21.6])
-        xps_table.append([73, 'Ta', '5', 's', '0', 69.7])
-        xps_table.append([73, 'Ta', '5', 'p', '1/2', 42.2])
-        xps_table.append([73, 'Ta', '5', 'p', '3/2', 32.7])
-
-        xps_table.append([74, 'W', '1', 's', '0', 69525])
-        xps_table.append([74, 'W', '2', 's', '0', 12100])
-        xps_table.append([74, 'W', '2', 'p', '1/2', 11544])
-        xps_table.append([74, 'W', '2', 'p', '3/2', 10207])
-        xps_table.append([74, 'W', '3', 's', '0', 2820])
-        xps_table.append([74, 'W', '3', 'p', '1/2', 2575])
-        xps_table.append([74, 'W', '3', 'p', '3/2', 2281])
-        xps_table.append([74, 'W', '3', 'd', '3/2', 1949])
-        xps_table.append([74, 'W', '3', 'd', '5/2', 1809])
-        xps_table.append([74, 'W', '4', 's', '0', 594.1])
-        xps_table.append([74, 'W', '4', 'p', '1/2', 490.4])
-        xps_table.append([74, 'W', '4', 'p', '3/2', 423.6])
-        xps_table.append([74, 'W', '4', 'd', '3/2', 255.9])
-        xps_table.append([74, 'W', '4', 'd', '5/2', 243.5])
-        xps_table.append([74, 'W', '4', 'f', '5/2', 33.6])
-        xps_table.append([74, 'W', '4', 'f', '7/2', 31.4])
-        xps_table.append([74, 'W', '5', 's', '0', 75.6])
-        xps_table.append([74, 'W', '5', 'p', '1/2', 45.3])
-        xps_table.append([74, 'W', '5', 'p', '3/2', 36.8])
-
-        xps_table.append([75, 'Re', '1', 's', '0', 71676])
-        xps_table.append([75, 'Re', '2', 's', '0', 12527])
-        xps_table.append([75, 'Re', '2', 'p', '1/2', 11959])
-        xps_table.append([75, 'Re', '2', 'p', '3/2', 10535])
-        xps_table.append([75, 'Re', '3', 's', '0', 2932])
-        xps_table.append([75, 'Re', '3', 'p', '1/2', 2682])
-        xps_table.append([75, 'Re', '3', 'p', '3/2', 2367])
-        xps_table.append([75, 'Re', '3', 'd', '3/2', 1949])
-        xps_table.append([75, 'Re', '3', 'd', '5/2', 1883])
-        xps_table.append([75, 'Re', '4', 's', '0', 625.4])
-        xps_table.append([75, 'Re', '4', 'p', '1/2', 518.7])
-        xps_table.append([75, 'Re', '4', 'p', '3/2', 446.8])
-        xps_table.append([75, 'Re', '4', 'd', '3/2', 273.9])
-        xps_table.append([75, 'Re', '4', 'd', '5/2', 260.5])
-        xps_table.append([75, 'Re', '4', 'f', '5/2', 42.9])
-        xps_table.append([75, 'Re', '4', 'f', '7/2', 40.5])
-        xps_table.append([75, 'Re', '5', 's', '0', 83])
-        xps_table.append([75, 'Re', '5', 'p', '1/2', 45.6])
-        xps_table.append([75, 'Re', '5', 'p', '3/2', 34.6])
-
-        xps_table.append([76, 'Os', '1', 's', '0', 73871])
-        xps_table.append([76, 'Os', '2', 's', '0', 12968])
-        xps_table.append([76, 'Os', '2', 'p', '1/2', 12385])
-        xps_table.append([76, 'Os', '2', 'p', '3/2', 10871])
-        xps_table.append([76, 'Os', '3', 's', '0', 3049])
-        xps_table.append([76, 'Os', '3', 'p', '1/2', 2792])
-        xps_table.append([76, 'Os', '3', 'p', '3/2', 2457])
-        xps_table.append([76, 'Os', '3', 'd', '3/2', 2031])
-        xps_table.append([76, 'Os', '3', 'd', '5/2', 1960])
-        xps_table.append([76, 'Os', '4', 's', '0', 658.2])
-        xps_table.append([76, 'Os', '4', 'p', '1/2', 549.1])
-        xps_table.append([76, 'Os', '4', 'p', '3/2', 470.7])
-        xps_table.append([76, 'Os', '4', 'd', '3/2', 293.1])
-        xps_table.append([76, 'Os', '4', 'd', '5/2', 278.5])
-        xps_table.append([76, 'Os', '4', 'f', '5/2', 53.4])
-        xps_table.append([76, 'Os', '4', 'f', '7/2', 50.7])
-        xps_table.append([76, 'Os', '5', 's', '0', 84])
-        xps_table.append([76, 'Os', '5', 'p', '1/2', 58])
-        xps_table.append([76, 'Os', '5', 'p', '3/2', 44.5])
-
-        xps_table.append([77, 'Ir', '1', 's', '0', 76111])
-        xps_table.append([77, 'Ir', '2', 's', '0', 13419])
-        xps_table.append([77, 'Ir', '2', 'p', '1/2', 12824])
-        xps_table.append([77, 'Ir', '2', 'p', '3/2', 11215])
-        xps_table.append([77, 'Ir', '3', 's', '0', 3174])
-        xps_table.append([77, 'Ir', '3', 'p', '1/2', 2909])
-        xps_table.append([77, 'Ir', '3', 'p', '3/2', 2551])
-        xps_table.append([77, 'Ir', '3', 'd', '3/2', 2116])
-        xps_table.append([77, 'Ir', '3', 'd', '5/2', 2040])
-        xps_table.append([77, 'Ir', '4', 's', '0', 691.1])
-        xps_table.append([77, 'Ir', '4', 'p', '1/2', 577.8])
-        xps_table.append([77, 'Ir', '4', 'p', '3/2', 495.8])
-        xps_table.append([77, 'Ir', '4', 'd', '3/2', 311.9])
-        xps_table.append([77, 'Ir', '4', 'd', '5/2', 296.3])
-        xps_table.append([77, 'Ir', '4', 'f', '5/2', 63.8])
-        xps_table.append([77, 'Ir', '4', 'f', '7/2', 60.8])
-        xps_table.append([77, 'Ir', '5', 's', '0', 95.2])
-        xps_table.append([77, 'Ir', '5', 'p', '1/2', 63])
-        xps_table.append([77, 'Ir', '5', 'p', '3/2', 48])
-
-        xps_table.append([78, 'Pt', '1', 's', '0', 78395])
-        xps_table.append([78, 'Pt', '2', 's', '0', 13880])
-        xps_table.append([78, 'Pt', '2', 'p', '1/2', 13273])
-        xps_table.append([78, 'Pt', '2', 'p', '3/2', 11564])
-        xps_table.append([78, 'Pt', '3', 's', '0', 3296])
-        xps_table.append([78, 'Pt', '3', 'p', '1/2', 3027])
-        xps_table.append([78, 'Pt', '3', 'p', '3/2', 2645])
-        xps_table.append([78, 'Pt', '3', 'd', '3/2', 2202])
-        xps_table.append([78, 'Pt', '3', 'd', '5/2', 2122])
-        xps_table.append([78, 'Pt', '4', 's', '0', 725.4])
-        xps_table.append([78, 'Pt', '4', 'p', '1/2', 609.1])
-        xps_table.append([78, 'Pt', '4', 'p', '3/2', 519.4])
-        xps_table.append([78, 'Pt', '4', 'd', '3/2', 331.6])
-        xps_table.append([78, 'Pt', '4', 'd', '5/2', 314.6])
-        xps_table.append([78, 'Pt', '4', 'f', '5/2', 74.5])
-        xps_table.append([78, 'Pt', '4', 'f', '7/2', 71.2])
-        xps_table.append([78, 'Pt', '5', 's', '0', 101.7])
-        xps_table.append([78, 'Pt', '5', 'p', '1/2', 65.3])
-        xps_table.append([78, 'Pt', '5', 'p', '3/2', 51.7])
-
-        xps_table.append([79, 'Au', '1', 's', '0', 80725])
-        xps_table.append([79, 'Au', '2', 's', '0', 14353])
-        xps_table.append([79, 'Au', '2', 'p', '1/2', 13734])
-        xps_table.append([79, 'Au', '2', 'p', '3/2', 11919])
-        xps_table.append([79, 'Au', '3', 's', '0', 3425])
-        xps_table.append([79, 'Au', '3', 'p', '1/2', 3148])
-        xps_table.append([79, 'Au', '3', 'p', '3/2', 2743])
-        xps_table.append([79, 'Au', '3', 'd', '3/2', 2291])
-        xps_table.append([79, 'Au', '3', 'd', '5/2', 2206])
-        xps_table.append([79, 'Au', '4', 's', '0', 762.1])
-        xps_table.append([79, 'Au', '4', 'p', '1/2', 642.7])
-        xps_table.append([79, 'Au', '4', 'p', '3/2', 546.3])
-        xps_table.append([79, 'Au', '4', 'd', '3/2', 353.2])
-        xps_table.append([79, 'Au', '4', 'd', '5/2', 335.1])
-        xps_table.append([79, 'Au', '4', 'f', '5/2', 87.6])
-        xps_table.append([79, 'Au', '4', 'f', '7/2', 83.9])
-        xps_table.append([79, 'Au', '5', 's', '0', 107.2])
-        xps_table.append([79, 'Au', '5', 'p', '1/2', 74.2])
-        xps_table.append([79, 'Au', '5', 'p', '3/2', 57.2])
-
-        xps_table.append([80, 'Hg', '1', 's', '0', 83102])
-        xps_table.append([80, 'Hg', '2', 's', '0', 14839])
-        xps_table.append([80, 'Hg', '2', 'p', '1/2', 14209])
-        xps_table.append([80, 'Hg', '2', 'p', '3/2', 12284])
-        xps_table.append([80, 'Hg', '3', 's', '0', 3562])
-        xps_table.append([80, 'Hg', '3', 'p', '1/2', 3279])
-        xps_table.append([80, 'Hg', '3', 'p', '3/2', 2847])
-        xps_table.append([80, 'Hg', '3', 'd', '3/2', 2385])
-        xps_table.append([80, 'Hg', '3', 'd', '5/2', 2295])
-        xps_table.append([80, 'Hg', '4', 's', '0', 802.2])
-        xps_table.append([80, 'Hg', '4', 'p', '1/2', 680.2])
-        xps_table.append([80, 'Hg', '4', 'p', '3/2', 576.6])
-        xps_table.append([80, 'Hg', '4', 'd', '3/2', 378.2])
-        xps_table.append([80, 'Hg', '4', 'd', '5/2', 358.8])
-        xps_table.append([80, 'Hg', '4', 'f', '5/2', 104])
-        xps_table.append([80, 'Hg', '4', 'f', '7/2', 99.9])
-        xps_table.append([80, 'Hg', '5', 's', '0', 127])
-        xps_table.append([80, 'Hg', '5', 'p', '1/2', 83.1])
-        xps_table.append([80, 'Hg', '5', 'p', '3/2', 64.5])
-        xps_table.append([80, 'Hg', '5', 'd', '3/2', 9.6])
-        xps_table.append([80, 'Hg', '5', 'd', '5/2', 7.8])
-
-        xps_table.append([81, 'Tl', '1', 's', '0', 85530])
-        xps_table.append([81, 'Tl', '2', 's', '0', 15347])
-        xps_table.append([81, 'Tl', '2', 'p', '1/2', 14698])
-        xps_table.append([81, 'Tl', '2', 'p', '3/2', 12658])
-        xps_table.append([81, 'Tl', '3', 's', '0', 3704])
-        xps_table.append([81, 'Tl', '3', 'p', '1/2', 3416])
-        xps_table.append([81, 'Tl', '3', 'p', '3/2', 2957])
-        xps_table.append([81, 'Tl', '3', 'd', '3/2', 2485])
-        xps_table.append([81, 'Tl', '3', 'd', '5/2', 2389])
-        xps_table.append([81, 'Tl', '4', 's', '0', 846.2])
-        xps_table.append([81, 'Tl', '4', 'p', '1/2', 720.5])
-        xps_table.append([81, 'Tl', '4', 'p', '3/2', 609.5])
-        xps_table.append([81, 'Tl', '4', 'd', '3/2', 405.7])
-        xps_table.append([81, 'Tl', '4', 'd', '5/2', 385])
-        xps_table.append([81, 'Tl', '4', 'f', '5/2', 122.2])
-        xps_table.append([81, 'Tl', '4', 'f', '7/2', 117.8])
-        xps_table.append([81, 'Tl', '5', 's', '0', 136])
-        xps_table.append([81, 'Tl', '5', 'p', '1/2', 94.6])
-        xps_table.append([81, 'Tl', '5', 'p', '3/2', 73.5])
-        xps_table.append([81, 'Tl', '5', 'd', '3/2', 14.7])
-        xps_table.append([81, 'Tl', '5', 'd', '5/2', 12.5])
-
-        xps_table.append([82, 'Pb', '1', 's', '0', 88005])
-        xps_table.append([82, 'Pb', '2', 's', '0', 15861])
-        xps_table.append([82, 'Pb', '2', 'p', '1/2', 15200])
-        xps_table.append([82, 'Pb', '2', 'p', '3/2', 13035])
-        xps_table.append([82, 'Pb', '3', 's', '0', 3851])
-        xps_table.append([82, 'Pb', '3', 'p', '1/2', 3554])
-        xps_table.append([82, 'Pb', '3', 'p', '3/2', 3066])
-        xps_table.append([82, 'Pb', '3', 'd', '3/2', 2586])
-        xps_table.append([82, 'Pb', '3', 'd', '5/2', 2484])
-        xps_table.append([82, 'Pb', '4', 's', '0', 891.8])
-        xps_table.append([82, 'Pb', '4', 'p', '1/2', 761.9])
-        xps_table.append([82, 'Pb', '4', 'p', '3/2', 643.5])
-        xps_table.append([82, 'Pb', '4', 'd', '3/2', 434.3])
-        xps_table.append([82, 'Pb', '4', 'd', '5/2', 412.2])
-        xps_table.append([82, 'Pb', '4', 'f', '5/2', 141.7])
-        xps_table.append([82, 'Pb', '4', 'f', '7/2', 136.9])
-        xps_table.append([82, 'Pb', '5', 's', '0', 147])
-        xps_table.append([82, 'Pb', '5', 'p', '1/2', 106.4])
-        xps_table.append([82, 'Pb', '5', 'p', '3/2', 83.3])
-        xps_table.append([82, 'Pb', '5', 'd', '3/2', 20.7])
-        xps_table.append([82, 'Pb', '5', 'd', '5/2', 18.1])
-
-        xps_table.append([83, 'Bi', '1', 's', '0', 90526])
-        xps_table.append([83, 'Bi', '2', 's', '0', 16388])
-        xps_table.append([83, 'Bi', '2', 'p', '1/2', 15711])
-        xps_table.append([83, 'Bi', '2', 'p', '3/2', 13419])
-        xps_table.append([83, 'Bi', '3', 's', '0', 3999])
-        xps_table.append([83, 'Bi', '3', 'p', '1/2', 3696])
-        xps_table.append([83, 'Bi', '3', 'p', '3/2', 3177])
-        xps_table.append([83, 'Bi', '3', 'd', '3/2', 2688])
-        xps_table.append([83, 'Bi', '3', 'd', '5/2', 2580])
-        xps_table.append([83, 'Bi', '4', 's', '0', 939])
-        xps_table.append([83, 'Bi', '4', 'p', '1/2', 805.2])
-        xps_table.append([83, 'Bi', '4', 'p', '3/2', 678.8])
-        xps_table.append([83, 'Bi', '4', 'd', '3/2', 464])
-        xps_table.append([83, 'Bi', '4', 'd', '5/2', 440.1])
-        xps_table.append([83, 'Bi', '4', 'f', '5/2', 162.3])
-        xps_table.append([83, 'Bi', '4', 'f', '7/2', 157])
-        xps_table.append([83, 'Bi', '5', 's', '0', 159.3])
-        xps_table.append([83, 'Bi', '5', 'p', '1/2', 119])
-        xps_table.append([83, 'Bi', '5', 'p', '3/2', 92.6])
-        xps_table.append([83, 'Bi', '5', 'd', '3/2', 26.9])
-        xps_table.append([83, 'Bi', '5', 'd', '5/2', 23.8])
-
-        self.xps_table = list(xps_table)
