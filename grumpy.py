@@ -80,6 +80,9 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 23.11.20    Added a kwarg in Load() (xps_sum = False) that prevents data in HM2 mode (or similar) to be
+                    compacted to one axis. Pass xps_sum = True to override this (i.e. True compacts).
+
 Version 23.11.15    Added a method (MakeArithmetic) to make an objectc out of a Grumpy dict that can handle arithmetic operations.
                     Does not apply to spin data (yet).
 
@@ -129,7 +132,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.11.15"
+__version__ = "23.11.20"
 __author__  = "Mats Leandersson"
 
 
@@ -256,7 +259,7 @@ def Load(file_name = '', path = '', shup = False, **kwargs):
     Load exported data from Prodigy.
     Identifies common measurement setups.
     """
-    recognized_kwargs = ['remove_spikes', 'filter_outliers', 'threshold']
+    recognized_kwargs = ['remove_spikes', 'filter_outliers', 'threshold', "sum_xps"]
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     DC = {}             # The main dict
@@ -427,6 +430,7 @@ def Load(file_name = '', path = '', shup = False, **kwargs):
     global defax_energy , defax_angle, defax_xdefl, defax_ydefl, defax_time, defax_position, defax_scattering_energy
 
     # ARPES or XPS
+    sum_xps = kwargs.get("sum_xps", False)
     if Measurement_type in ['XPS', 'ARPES']:
         # ARPES: [y:e]
         data_ = []
@@ -437,13 +441,23 @@ def Load(file_name = '', path = '', shup = False, **kwargs):
         for na in range(NA):
             data_.append(np.array(DC.get('Data')[0][1][na*NE:(na+1)*NE]))
         data = np.array(data_)
-        if abs(angle_y.min()) < 1 and abs(angle_y.max()) < 1: 
+        if abs(angle_y.min()) < 1 and abs(angle_y.max()) < 1 and sum_xps: 
             DC.update({'Measurement_type': Measurement_type})
             DC.update({'x': energy})
             Meta.update({'x_label': DC.get('Experiment').get('Energy_Axis', '')})
             Meta.update({'x_type': defax_energy})
             DC.update({'int': data[:,:].sum(axis = 0)})
             Meta.update({'intlabel': DC.get('Experiment').get('Count_Rate', '')})
+        elif abs(angle_y.min()) < 1 and abs(angle_y.max()) < 1 and not sum_xps:
+            DC.update({'Measurement_type': Measurement_type})
+            DC.update({'x': energy})
+            Meta.update({'x_label': DC.get('Experiment').get('Energy_Axis', '')})
+            Meta.update({'x_type': defax_energy})
+            DC.update({'y': NonEnergyOrdinate})
+            Meta.update({'y_label': 'Position (mm)'})
+            Meta.update({'y_type': defax_position})
+            DC.update({'int': data})
+            Meta.update({'int_label': DC.get('Experiment').get('Count_Rate', '')})
         else:
             DC.update({'Measurement_type': Measurement_type})
             DC.update({'x': energy})
