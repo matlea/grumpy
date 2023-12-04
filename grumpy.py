@@ -34,7 +34,7 @@ Measurement types:
     spin_deflector_1b (1)                [y,x] = [deflection, energy]
     manipulator_line_scan                  [x] = [poisition]            for fixed energy
 
-(1) Line scan with one deflector, (2) Line scan using both deflectors.
+(1) Line scan with one deflector, (2) Line scan using both deflectors. 
 
 Main methods:
     Load()
@@ -45,6 +45,7 @@ Main methods:
     QuickSpin()
     QuickSpinMDC()
     Polarization()      Not checked after re-write.
+    MergeSpinEDC()      Merge two spin edc data sets into one (merged_data = MergeSpinEDC(data1,data2))
 
     Explore()           For 2d and 3d data. Not quite ready but it works. Need to add option to rotate the images.
     ShiftAxis()
@@ -60,6 +61,8 @@ Main methods:
     xps()               Not a method but a class, containing binding energies for elements.
 
     SortP()             (Loader for general data not covered by the types listed above. A work in progress. Slow work, slow progress.)
+
+    ExportSpinEDC()     Save spin edc as a 3-column file (E, NegPol off, NegPol on)
     
     MakeArithmetic()    Makes an object out of a Grumpy dict which can handle arithmetic operations. Applies to non-spin data.
 
@@ -79,6 +82,8 @@ Notes:
 --- 
 
 Version history (from 23.05.15 and onwards):
+
+Version 23.12.04    Added MergeSpinEDC() to merge spin edc:s with the same settings.
 
 Version 23.11.20    Added a kwarg in Load() (xps_sum = False) that prevents data in HM2 mode (or similar) to be
                     compacted to one axis. Pass xps_sum = True to override this (i.e. True compacts).
@@ -132,7 +137,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.11.20"
+__version__ = "23.12.04"
 __author__  = "Mats Leandersson"
 
 
@@ -144,6 +149,7 @@ from scipy.optimize import curve_fit
 
 from colorama import Fore
 from sys import getsizeof
+from copy import deepcopy
 
 try: 
     import ipywidgets as ipw
@@ -254,7 +260,7 @@ def MeasurementType(data, shup = False, **kwargs):
 
 
 
-def Load(file_name = '', path = '', shup = False, **kwargs):
+def Load(file_name = '', path = '', shup = True, **kwargs):
     """
     Load exported data from Prodigy.
     Identifies common measurement setups.
@@ -345,6 +351,8 @@ def Load(file_name = '', path = '', shup = False, **kwargs):
                 if row.startswith("# Parameter:") and not "Step" in row:
                     par = row.split(":")[1].split('=')[0].replace('" ', '').replace(' "', '')
                     Parameters.append(par)
+                if row.startswith("Number of Scans:"):
+                    Experiment.update({'Number_of_scans': int(row.split(':')[1])})
                 if row == '# Cycle: 0':
                     DataRowStart = i
                 if row.startswith('# ColumnLabels'):
@@ -403,8 +411,11 @@ def Load(file_name = '', path = '', shup = False, **kwargs):
                 if not row.startswith('#'):
                     values = row.split('  ')
                     try:
-                        Data.append([float(values[0]), float(values[-1])])
+                        #Data.append([float(values[0]), float(values[-1])])
+                        Data.append([float(values[0]), float(values[1])])
                     except:
+                        #print("There might be an issue with the number of columns in the file. Not with the")
+                        #print("data file itself but how data is stored.")
                         pass
         DATA.append(np.transpose(Data))
     DATA.pop(0)
@@ -1947,7 +1958,7 @@ def QuickSpin(D = {}, **kwargs):
         ax[3].plot(energy, P1, color = 'tab:blue', label = 'P1', linewidth = linewidth, linestyle = linestyle)
         ax[3].plot(energy, P2, color = 'tab:red', label = 'P2', linewidth = linewidth, linestyle = linestyle)
         ax[3].legend()
-        ax[3].set_title('polarization, S = {0}'.format(sherman))
+        ax[3].set_title('Components, S = {0}'.format(sherman))
     
     DD = copy.deepcopy(D)
     DD.update({'int': edc_off})
@@ -2126,8 +2137,6 @@ def QuickSpinMDC(D = {}, **kwargs):
         DD.update({'asymmetry': asym_map})
     
     return DD
-
-        
 
         
 
@@ -2600,7 +2609,7 @@ def Fit(D = {}, profile = '', **kwargs):
 def removeSpikes(Y,threshold=2):
     """
     Curtesy of Craig.
-    Removes spikes from a 1D intensity array.
+    Removes spikes from 1D or 2D intensity arrays.
     """
     if len(np.shape(Y)) > 2:
         print(Fore.RED + "This works for 1d and 2d data."+ Fore.BLACK)
@@ -2651,9 +2660,28 @@ def removeSpikes(Y,threshold=2):
         return YY
 
 
-def filterOutliers(Y,threshold=2):
-    print(Fore.LIGHTRED_EX + "Note: filterOutliers() is a legacy method name. Will be removed. Use removeSpikes()."+ Fore.BLACK)
-    return removeSpikes(Y,threshold=2)
+def removeSpikes2(Y,threshold=2):
+    """
+    Removes spikes from 1D arrays.
+    """
+    if len(np.shape(Y)) > 1:
+        print(Fore.RED + "This works for 1d data."+ Fore.BLACK)
+        return Y
+    #
+    for i, y in enumerate(Y[:-4]):
+        ymin = min(Y[i:i+4])
+        if Y[i] > threshold * ymin:
+            Y[i] = (Y[i+1]+Y[i+2]+Y[i+3])/3
+        if Y[i+1] > threshold * ymin:
+            Y[i+1] = (Y[i]+Y[i+2]+Y[i+3])/3
+        if Y[i+2] > threshold * ymin:
+            Y[i+2] = (Y[i]+Y[i+1]+Y[i+3])/3
+        if Y[i+3] > threshold * ymin:
+            Y[i+3] = (Y[i]+Y[i+1]+Y[i+2])/3
+    return Y
+            
+    
+    
 
 
 
@@ -3182,6 +3210,163 @@ def AppendFEmaps(data1 = {}, data2 = {}, shup = False):
     result = {'Type': 'fermi_map', 'MeasurementType': 'fermi_map', 'Meta': data1.get("Meta", {})}
     result.update({'x': x1, 'y': y1, 'z': Z, 'int': int})
     return result
+
+
+
+
+
+
+# ============================================================================================================
+# ============================================================================================================
+# ============================================================================================================
+# ============================================================================================================
+
+def ExportSpinEDC(data = {}, sum = True):
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a grumpy dict" + Fore.BLACK)
+        return
+    #
+    energy = data.get("x", [])
+    off = data.get("int", [])
+    on = data.get("int_on", [])
+    if not(len(energy)>0 and len(off)>0 and len(on)>0):
+        print(Fore.RED + "Could not find data." + Fore.BLACK)
+        return
+    #
+    fidn = data.get("Experiment",{}).get("Spectrum_ID")
+    try: fidn = int(fidn)
+    except:
+        print(Fore.RED + "Could not find data spectrum ID" + Fore.BLACK)
+        return
+    #
+    file_name = f"id{fidn}.dat"
+    f = open(file_name, "w")
+    #
+    ret = data.get("Experiment",{}).get("Lens_Mode", "")
+    if not ret == "": f.write(f"# Lens mode: {ret}\n")
+    #
+    ret = data.get("Experiment",{}).get("Scan_Mode", "")
+    if not ret == "": f.write(f"# Scan mode: {ret}\n")
+    #
+    ret = data.get("Experiment",{}).get("Dwell_Time", "")
+    if not ret == "": f.write(f"# Dwell time: {ret}\n")
+    #
+    ret = data.get("Experiment",{}).get("Excitation_Energy", "")
+    if not ret == "": f.write(f"# Excitation energy: {ret}\n")
+    #
+    ret = data.get("Experiment",{}).get("Pass_Energy", "")
+    if not ret == "": f.write(f"# Pass energy: {ret}\n")
+    #
+    ret = data.get("Experiment",{}).get("Column_labels", "")
+    if not ret == "": f.write(f"# Column labels: {ret}\n")
+
+    if sum:
+        for i in range(len(energy)):
+            f.write(f"{energy[i]:7.3f}\t{off[i]}\t{on[i]}\n")
+    else:
+        Off = data.get("int_all")
+        On = data.get("int_all_on")
+        leg = "E, "
+        for i in range(len(Off)): leg = leg + "off, "
+        for i in range(len(On)): leg = leg + "on, "
+        f.write(f"# {leg}\n")
+        for i in range(len(energy)):
+            row = f"{energy[i]:7.3f}"
+            for j in range(np.shape(Off)[0]):
+                row += f"\t{Off[j][i]:11.4f}"
+            for j in range(np.shape(On)[0]):
+                row += f"\t{Off[j][i]:11.4f}"
+            f.write(f"{row}\n")
+    f.close()
+    print(Fore.GREEN + f"Data in {file_name}" + Fore.BLACK)
+
+
+
+
+
+# ============================================================================================================
+# ============================================================================================================ Merge spin edcs
+# ============================================================================================================
+# ============================================================================================================
+
+def MergeSpinEDC(data1 = {}, data2 = {}):
+    """
+    """
+    if not type(data1) is dict or not type(data2) is dict:
+        print(Fore.RED + f"Arguments data1 and data2 must be dicts." + Fore.BLACK)
+        return {}
+    #
+    if data2 == {}: return data1
+    #
+    if not (data1.get("Measurement_type") == "spin_edc" and data2.get("Measurement_type") == "spin_edc"):
+        print(Fore.RED + f"Arguments data1 and data2 must be spin edc dicts." + Fore.BLACK)
+        return {}
+    #
+    shp1, shp2 = np.shape(data1.get("Data")), np.shape(data2.get("Data"))
+    if not (shp1[1] == shp2[1] and shp1[2] == shp2[2]):
+        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.BLACK)
+        return {}
+    #
+    if not(data1.get("Experiment", {}).get("Ep") == data2.get("Experiment", {}).get("Ep")):
+        print(Fore.RED + f"Arguments data1 and data2 have different pass energies." + Fore.BLACK)
+        return {}
+    #
+    if not(data1.get("Data")[0][0][0] == data2.get("Data")[0][0][0] and data1.get("Data")[0][0][-1] == data2.get("Data")[0][0][-1]):
+        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.BLACK)
+        return {}
+    #
+    File = deepcopy(data1.get("File", {}))
+    File.update({"file_name": f'{data1.get("File", {}).get("file_name", "")}, {data2.get("File", {}).get("file_name", "")}'})
+    File.update({"file": f'{data1.get("File", {}).get("file", "")}, {data2.get("File", {}).get("file", "")}'})
+    Experiment = deepcopy(data1.get("Experiment", {}))
+    Experiment.update({"Spectrum_ID": -1})
+    Parameters = deepcopy(data1.get("Parameters", []))
+    Parameter_values = []
+    Parameter_values1, Parameter_values2 = data1.get("Parameter_values", []), data2.get("Parameter_values", [])
+    for p in Parameter_values1[0]: Parameter_values.append(p)
+    for p in Parameter_values2[0]: Parameter_values.append(p)
+    Data = []
+    for d in data1.get("Data", []): Data.append(d)
+    for d in data2.get("Data", []): Data.append(d)
+    Measurement_type = data1.get("Measurement_type", "")
+    x = data1.get("x", np.array([]))
+    
+    intens1, intens2, n1, n2, intens1b, intens2b = np.zeros(len(x)), np.zeros(len(x)), 0, 0, [], []
+    for i, p in enumerate(Parameter_values):
+        
+        if "OFF" in p:
+            intens1 += Data[i][1]
+            intens1b.append(Data[i][1])
+            n1 += 1
+        if "ON" in p:
+            intens2 += Data[i][1]
+            intens2b.append(Data[i][1])
+            n2 += 1
+    intens1, intens2 = np.array(intens1)/n1, np.array(intens2)/n2
+
+    asymmetry = np.zeros([len(x)])
+    for i in range(len(x)):
+        denom = (intens1[i] + intens2[i])
+        if not denom == 0:
+            nom = (intens1[i] - intens2[i])
+            asymmetry[i] = (nom/denom)
+        else:
+            asymmetry[i] = 0
+
+    Meta, Type = data1.get("Meta", {}), data1.get("Type", "")
+
+    NewDict = {"File": File, "Experiment":Experiment, "Parameters":Parameters, "Parameter_values":Parameter_values, 
+                "Data": Data, "Measurement_type": Measurement_type, "x":x, "int": intens1, "int_on": intens2,
+                "int_all": intens1b, "int_all_on": intens2b, "asymmetry": asymmetry, "Meta": Meta, "Type": Type}
+
+    return NewDict
+
+
+
+
+
+
+
 
 
 
