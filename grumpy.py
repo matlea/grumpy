@@ -1470,7 +1470,8 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
 
     
 
-    
+
+
 
 
 
@@ -1501,7 +1502,7 @@ def PlotFermiMap(D = {}, **kwargs):
     ENERGY = D.get('x')
     ANGLEX = D.get('z')
     ANGLEY = D.get('y')
-    print("\n debug -", ENERGY[0], ANGLEX[0], ANGLEY[0], "\n")     # DEBUG
+    #print("\n debug -", ENERGY[0], ANGLEX[0], ANGLEY[0], "\n")     # DEBUG
     dENERGY = (ENERGY[-1]-ENERGY[0])/len(ENERGY)
     dANGLEX = abs(ANGLEX[1]-ANGLEX[0])
     dANGLEY = abs(ANGLEY[1]-ANGLEY[0])
@@ -3363,7 +3364,89 @@ def MergeSpinEDC(data1 = {}, data2 = {}):
 
 
 
+# ============================================================================================================
 
+class MassageSpinEDC():
+    """
+    """
+    def __init__(self, data = {}):
+        try:
+            mtype = data.get("Measurement_type", "")
+        except:
+            print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.BLACK); return
+        if not mtype == "spin_edc":
+            print(Fore.RED + 'Argument data must be a grumpy dict containing spin edc data.' + Fore.BLACK); return
+        #
+        self.data = data
+        self.Data = data.get("Data")
+        self.x = self.data.get("x", np.array([]))
+        dX = (self.x[-1]-self.x[0])/len(self.x)
+
+        self._SliderC = ipw.FloatSlider(min=1, max=len(self.Data), step = 1, description = 'Curve', value = 0, readout_format = ".0f")
+        self._SliderX = ipw.FloatSlider(min=self.x[0], max=self.x[-1], step = dX, description = 'Energy', value = dX, readout_format = ".2f")
+
+        self._ButtonPlus = ipw.Button(descripton = "+")
+        self._ButtonPlus.on_click(self._ButtonPlusCicked)
+
+        self._ButtonMinus = ipw.Button(descripton = "-")
+        self._ButtonMinus.on_click(self._ButtonMinusCicked)
+
+        self._box1 = ipw.HBox([self._SliderC, self._SliderX, self._ButtonPlus, self._ButtonMinus])
+
+        def plot(c, x):
+            Y = self.Data[int(c)-1][1]
+            fig, ax = plt.subplots(figsize = (8,5))
+
+            if "OFF" in data.get("Parameter_values")[0][int(c)-1]: lcol = "tab:blue"
+            else: lcol = "tab:orange"
+            
+            ax.plot(self.x,Y, color = lcol)
+            ax.axvline(x = x, color = 'k', linestyle = "--")
+            ix = abs(x - self.x).argmin()
+            ax.axhline(y = Y[ix], color = 'k', linestyle = "--")
+
+        self._Interact = ipw.interactive_output(plot, {'c': self._SliderC, 'x': self._SliderX})
+        self._box_out = ipw.VBox([self._box1, self._Interact])
+        display(self._box_out)
+
+    def _ButtonPlusCicked(self, b):
+        c = self._SliderC.value
+        x = self._SliderX.value
+        ix = abs(x - self.Data[int(c)-1][0]).argmin()
+        y = self.Data[int(c)-1][1][ix]
+        self.Data[int(c)-1][1][ix] = 0.975*y
+
+    def _ButtonMinusCicked(self, b):
+        c = self._SliderC.value
+        x = self._SliderX.value
+        ix = abs(x - self.Data[int(c)-1][0]).argmin()
+        y = self.Data[int(c)-1][1][ix]
+        self.Data[int(c)-1][1][ix] = 0.975*y
+
+    def Get(self):
+        Parameter_values = self.data.get("Parameter_values", [])
+        intens1, intens2, n1, n2, intens1b, intens2b = np.zeros(len(self.x)), np.zeros(len(self.x)), 0, 0, [], []
+        for i, p in enumerate(Parameter_values[0]):
+            if "OFF" in p:
+                intens1 += self.Data[i][1]
+                intens1b.append(self.Data[i][1])
+                n1 += 1
+            if "ON" in p:
+                intens2 += self.Data[i][1]
+                intens2b.append(self.Data[i][1])
+                n2 += 1
+        intens1, intens2 = np.array(intens1)/n1, np.array(intens2)/n2
+        asymmetry = np.zeros([len(self.x)])
+        for i in range(len(self.x)):
+            denom = (intens1[i] + intens2[i])
+            if not denom == 0:
+                nom = (intens1[i] - intens2[i])
+                asymmetry[i] = (nom/denom)
+            else:
+                asymmetry[i] = 0
+        self.data.update({"Data": self.Data, "int": intens1, "int_on": intens2, 
+            "int_all": intens1b, "int_all_on": intens2b, "asymmetry": asymmetry})
+        return self.data
 
 
 
