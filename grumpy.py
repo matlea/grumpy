@@ -43,6 +43,7 @@ Main methods:
     Compact()           Does not work with spin data yet.
     Profile()           (combines SubArray() and Compact()).
     QuickSpin()
+    SpinEDC()
     QuickSpinMDC()
     Polarization()      Not checked after re-write.
     MergeSpinEDC()      Merge two spin edc data sets into one (merged_data = MergeSpinEDC(data1,data2))
@@ -82,6 +83,12 @@ Notes:
 --- 
 
 Version history (from 23.05.15 and onwards):
+
+Version 23.12.16    Updated SpinEDC().
+                    Updated MassageSpinEDC() (added some time ago but failed to update history then)
+
+Version 23.12.16    Updated ExportSpinEDC(). This method was added a week ago but I forgot to update the history.
+                    Added SpinEDC(). A method to manipulated spin edc data (normalize, exclude, etc) and create a new data dict.
 
 Version 23.12.04    Added MergeSpinEDC() to merge spin edc:s with the same settings.
 
@@ -137,7 +144,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.12.04"
+__version__ = "23.12.17"
 __author__  = "Mats Leandersson"
 
 
@@ -1851,6 +1858,168 @@ def _Explore3d(D = {}, **kwargs):
 # ============================================================================================================
 # ============================================================================================================
 
+class SpinEDC():
+    """
+    Interactive manipulation of spin edc data.
+    Use:
+        interactive = SpinEDC(loaded_dict)
+        new_dict = interactive.result()
+    """
+    def __init__(self, data = {}, s = None):
+        if not type(data) is dict:
+            print(Fore.RED + 'Argument data must a grumpy dict.' + Fore.BLACK); return
+        if not data.get('Type', '') == 'spin_edc':
+            print(Fore.RED + 'The dicts does not contain spin edc data.' + Fore.BLACK); return
+        #
+        print(Fore.BLUE + "Deselect edcs you don't want to use. Normalize the edcs at a certain energy.")
+        print("Export the result (to a new dict) using the SpinEDC.result() method.\n" + Fore.BLACK)
+        #
+        if type(s) is type(None):
+            global SHERMAN
+            self.sherman = SHERMAN
+        else:
+            self.sherman = s
+        self.data = data
+        self.Data = data.get("Data")
+        self.Parameter_values = data.get("Parameter_values")[0]
+        self.energy = self.data.get("x", np.array([]))
+
+        self.all_curves = []
+        self.avg_on  = []
+        self.avg_off = []
+        self.asym = []
+        self.included = []
+
+        self.include_checkboxes = []
+        self.interact_args = {}
+        for i, par in enumerate(self.Parameter_values):
+            if "OFF" in par: mpol = f"off {i+1}"
+            else: mpol = f"on {i+1}"
+            self.include_checkboxes.append(ipw.Checkbox(value = True, description = mpol, width = 10))
+            self.interact_args.update({mpol: self.include_checkboxes[-1]})
+        self._box1 = ipw.HBox(layout = ipw.Layout(width="100%", display="inline-flex", flex_flow="row_wrap"))
+        self._box1.children = [chbx for chbx in self.include_checkboxes]
+        #self._box1 = ipw.HBox(self.include_checkboxes)
+        
+        self.legend1_checkbox = ipw.Checkbox(value = True, description = "Show legend")
+        self.interact_args.update({"legend1": self.legend1_checkbox})
+        self._box2 = ipw.HBox([self.legend1_checkbox])
+
+        self.norm_checkbox = ipw.Checkbox(value = False, description = "Normalize")
+        self.norm_energy_slider = ipw.FloatSlider(min = self.Data[0][0][0], max = self.Data[0][0][-1], 
+            step = self.Data[0][0][1] - self.Data[0][0][0], description = 'Energy', readout_format = ".000f")
+        self.norm_energy_width_slider = ipw.FloatSlider(min = self.Data[0][0][1] - self.Data[0][0][0], 
+            max = 10 * (self.Data[0][0][1] - self.Data[0][0][0]), step = self.Data[0][0][1] - self.Data[0][0][0], description = 'Width')
+        self.interact_args.update({"normalize": self.norm_checkbox, "norm_energy": self.norm_energy_slider, "norm_energy_width": self.norm_energy_width_slider})
+        self._box3 = ipw.VBox([self.norm_checkbox, self.norm_energy_slider, self.norm_energy_width_slider])
+
+        self.sherman_slider = ipw.FloatSlider(min = 0.05, max = 0.65, step = 0.01, description = 'Sherman', value = self.sherman)
+        self.interact_args.update({"sherman": self.sherman_slider})
+        self._box4 = ipw.HBox([self._box3, self.sherman_slider])
+
+        def Plot(**kwargs):
+            fig, ax = plt.subplots(ncols = 3, figsize = (12,4))
+            #
+            self.Parameter_values_used = []
+            self.all_curves = []
+            for d in self.Data: self.all_curves.append(d[1])
+            #
+            if self.norm_checkbox.value:
+                ax[0].axvline(x = self.norm_energy_slider.value, color = "k", linestyle = "--", linewidth = 0.65)
+                ax[0].axvline(x = self.norm_energy_slider.value + self.norm_energy_width_slider.value, color = "k", linestyle = "--", linewidth = 0.65)
+                i1 = abs(self.norm_energy_slider.value - self.Data[0][0]).argmin()
+                i2 = abs(self.norm_energy_slider.value + self.norm_energy_width_slider.value - self.Data[0][0]).argmin()+1
+                for i, d in enumerate(self.all_curves):
+                    norm = d[i1:i2].sum()/(i2-i1)
+                    self.all_curves[i] = d/norm
+            #
+            self.avg_on, self.avg_off =  np.zeros(len(self.Data[0][0])), np.zeros(len(self.Data[0][0]))
+            n_on, n_off = 0, 0
+            self.included = []
+            for i, d in enumerate(self.all_curves):
+                if "OFF" in self.Parameter_values[i]:
+                    mpol = f"off {i+1}"
+                    if self.include_checkboxes[i].value:
+                        self.avg_off += d
+                        self.included.append(i)
+                        n_off += 1
+                        liwi = 1; listy = "-"
+                    else:
+                        liwi = 0.75; listy = ":"
+                else:
+                    mpol = f"on {i+1}"
+                    if self.include_checkboxes[i].value:
+                        self.avg_on += d
+                        self.included.append(i)
+                        n_on += 1
+                        liwi = 1; listy = "-"
+                    else:
+                        liwi = 0.75; listy = ":"
+                ax[0].plot(self.energy, d, linestyle = listy, linewidth = liwi, label = mpol)
+            #
+            if n_off > 0: self.avg_off /= n_off
+            if n_on > 0: self.avg_on /= n_on
+            ax[1].plot(self.energy, self.avg_off, color = "blue", label = "off")
+            ax[1].plot(self.energy, self.avg_on,  color = "red",  label = "on")
+            #
+            self.asym = np.zeros(len(self.energy))
+            for i in range(len(self.asym)):
+                denom = self.avg_off[i] + self.avg_on[i]
+                if not denom < 1e-4:
+                    self.asym[i] = (self.avg_off[i] - self.avg_on[i])/denom
+                else:
+                    self.asym[i] = 0
+            self.sherman = self.sherman_slider.value
+            self.asym /= self.sherman
+            ax[2].plot(self.energy, self.asym, color = 'k')
+            for i, txt in enumerate(["EDCs", "Average", "Asymmetry"]):
+                ax[i].set_title(txt)
+                ax[i].set_xlabel("Energy, eV")
+            if self.legend1_checkbox.value:
+                ax[0].legend()
+                ax[1].legend()
+            fig.tight_layout()
+
+        self._Interact = ipw.interactive_output(Plot, self.interact_args)
+        self._box_out = ipw.VBox([self._box1, self._box2, self._Interact, self._box4])
+        display(self._box_out)
+
+    def result(self):
+        result = deepcopy(self.data)
+        #
+        pvs = []
+        for i, pv in enumerate(self.Parameter_values):
+            if i in self.included: pvs.append(pv)
+        result.update({"Parameter_values": pvs})
+        #
+        Data = []
+        for i, edc in enumerate(self.all_curves):
+            if i in self.included:
+                Data.append(np.array([self.energy, edc]))
+        result.update({"Data": Data})
+        #
+        result.update({"int": self.avg_off, "int_on": self.avg_on, "asymmetry": self.asym})
+        #
+        all_off, all_on = [], []
+        for i, edc in enumerate(self.all_curves):
+            if i in self.included:
+                if "OFF" in self.Parameter_values[i]:
+                    all_off.append(edc)
+                else:
+                    all_on.append(edc)
+        result.update({"int_all": all_off, "int_all_on": all_on})
+        #
+        return result
+
+
+
+
+
+
+
+
+ # ============================================================================================================   
+
 
 def QuickSpin(D = {}, **kwargs):
 
@@ -1869,7 +2038,7 @@ def QuickSpin(D = {}, **kwargs):
     """
     #
     recognized_kwargs = ['plot', 'shup', 'figsize', 'linewidth', 'linestyle', 'exclude', 'median_filter', 
-                         'size', 'mode', 'remove_spikes', 'filter_outliers', 'threshold']
+                         'size', 'mode', 'remove_spikes', 'filter_outliers', 'threshold', 'sherman']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     plot = kwargs.get('plot', True)
@@ -1950,8 +2119,8 @@ def QuickSpin(D = {}, **kwargs):
         else:
             asymmetry[i] = 0
     if plot:
-        ax[2].plot(energy, asymmetry, linewidth = linewidth, color = 'k')
-        ax[2].set_title('asymmetry')
+        ax[2].plot(energy, asymmetry / sherman, linewidth = linewidth, color = 'k')
+        ax[2].set_title(f'asymmetry (S = {sherman})')
     
     P1 = (edc_off + edc_on) * (1 + asymmetry / sherman) * 0.5 # there must be a 0.5 here, right?
     P2 = (edc_off + edc_on) * (1 - asymmetry / sherman) * 0.5
@@ -1964,7 +2133,7 @@ def QuickSpin(D = {}, **kwargs):
     DD = copy.deepcopy(D)
     DD.update({'int': edc_off})
     DD.update({'int_on': edc_on})
-    DD.update({'asymmetry': asymmetry})
+    DD.update({'asymmetry': asymmetry/sherman})
     return DD
 
 
@@ -3222,16 +3391,33 @@ def AppendFEmaps(data1 = {}, data2 = {}, shup = False):
 # ============================================================================================================
 # ============================================================================================================
 
-def ExportSpinEDC(data = {}, sum = True):
+def ExportSpinEDC(data = {}, exclude = []):
     if not type(data) is dict:
         print(Fore.RED + "Argument data must be a grumpy dict" + Fore.BLACK)
         return
     #
-    energy = data.get("x", [])
-    off = data.get("int", [])
-    on = data.get("int_on", [])
-    if not(len(energy)>0 and len(off)>0 and len(on)>0):
-        print(Fore.RED + "Could not find data." + Fore.BLACK)
+    if not type(exclude) is list:
+        print(Fore.BLACK + "Argument exclude must be a list of integers. Ignoring this argument." + Fore.BLACK)
+        exclude = []
+    #
+    if not data.get("Experiment", {}).get("Analyzer", "") == "PhoibosSpin":
+        print(Fore.RED + "The dicts does not contain spin data." + Fore.BLACK)
+        return
+    if not "NegativePolarity" in data.get("Parameters"):
+        print(Fore.RED + "Expected 'NegativePolarity' as a parameter but could not find it." + Fore.BLACK)
+        return
+    try:
+        Parameter_values = data.get("Parameter_values", [])[0]
+    except:
+        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.BLACK)
+        return
+    if len(Parameter_values) == 0:
+        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.BLACK)
+        return
+    #
+    Data = data.get("Data", [])
+    if not len(np.shape(Data)) == 3:
+        print(Fore.RED + "The data in the dict is not formatted as I would expect." + Fore.BLACK)
         return
     #
     fidn = data.get("Experiment",{}).get("Spectrum_ID")
@@ -3242,44 +3428,58 @@ def ExportSpinEDC(data = {}, sum = True):
     #
     file_name = f"id{fidn}.dat"
     f = open(file_name, "w")
-    #
+    f.write(f"# File id: {fidn}\n")
     ret = data.get("Experiment",{}).get("Lens_Mode", "")
     if not ret == "": f.write(f"# Lens mode: {ret}\n")
-    #
     ret = data.get("Experiment",{}).get("Scan_Mode", "")
     if not ret == "": f.write(f"# Scan mode: {ret}\n")
-    #
     ret = data.get("Experiment",{}).get("Dwell_Time", "")
     if not ret == "": f.write(f"# Dwell time: {ret}\n")
-    #
     ret = data.get("Experiment",{}).get("Excitation_Energy", "")
     if not ret == "": f.write(f"# Excitation energy: {ret}\n")
-    #
     ret = data.get("Experiment",{}).get("Pass_Energy", "")
     if not ret == "": f.write(f"# Pass energy: {ret}\n")
-    #
     ret = data.get("Experiment",{}).get("Column_labels", "")
     if not ret == "": f.write(f"# Column labels: {ret}\n")
-
-    if sum:
-        for i in range(len(energy)):
-            f.write(f"{energy[i]:7.3f}\t{off[i]}\t{on[i]}\n")
-    else:
-        Off = data.get("int_all")
-        On = data.get("int_all_on")
-        leg = "E, "
-        for i in range(len(Off)): leg = leg + "off, "
-        for i in range(len(On)): leg = leg + "on, "
-        f.write(f"# {leg}\n")
-        for i in range(len(energy)):
-            row = f"{energy[i]:7.3f}"
-            for j in range(np.shape(Off)[0]):
-                row += f"\t{Off[j][i]:11.4f}"
-            for j in range(np.shape(On)[0]):
-                row += f"\t{Off[j][i]:11.4f}"
-            f.write(f"{row}\n")
+    #
+    column_txt, excluded_txt = "# Columns: energy, OFF_avg, ON_avg", "# Excluded from the avgerages:"
+    for i, par in enumerate(Parameter_values):
+        column_txt = f"{column_txt}, {i}_{par.strip(' ')}"
+        if i in exclude: excluded_txt = f"{excluded_txt} {i}_{par.strip(' ')}"
+    f.write(f"{column_txt}\n")
+    if len(exclude) > 0: f.write(f"{excluded_txt}\n")
+    #
+    energy = Data[0][0]
+    avg_off, avg_on = np.zeros(len(energy)), np.zeros(len(energy))
+    n_off, n_on = 0, 0
+    for i, D in enumerate(Data):
+        if not i in exclude:
+            if "OFF" in Parameter_values[i]:
+                avg_off += D[1]
+                n_off += 1
+            elif "ON" in Parameter_values[i]:
+                avg_on += D[1]
+                n_on += 1
+    if n_off > 0: avg_off /= n_off
+    if n_on >  0: avg_on  /= n_on
+    #
+    for ie, E in enumerate(energy):
+        row = f"{E:7.3f}\t{avg_off[ie]:11.3f}\t{avg_on[ie]:11.3f}"
+        for D in Data:
+            row = f"{row}\t{D[1][ie]:11.3f}"
+        f.write(f"{row}\n")
+    #
     f.close()
-    print(Fore.GREEN + f"Data in {file_name}" + Fore.BLACK)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3370,6 +3570,11 @@ class MassageSpinEDC():
     """
     """
     def __init__(self, data = {}):
+        print(Fore.MAGENTA + "Note: I haven't been able to figure out how to make the decrease and increase buttons")
+        print("automatically update the graph. For now: update by sliding a slider forwards and backwards.\n" + Fore.BLACK)
+        #
+        print(Fore.BLUE + "Select curve, position the energy at a spike. Click the decrease and increase buttons")
+        print("to adjust. Use the result() method to get an updated data dict.\n" + Fore.BLACK)
         try:
             mtype = data.get("Measurement_type", "")
         except:
@@ -3379,34 +3584,49 @@ class MassageSpinEDC():
         #
         self.data = data
         self.Data = data.get("Data")
-        self.x = self.data.get("x", np.array([]))
-        dX = (self.x[-1]-self.x[0])/len(self.x)
+        self.energy = self.data.get("x", np.array([]))
+        dX = (self.energy[-1]-self.energy[0])/(len(self.energy)-1)
 
         self._SliderC = ipw.FloatSlider(min=1, max=len(self.Data), step = 1, description = 'Curve', value = 0, readout_format = ".0f")
-        self._SliderX = ipw.FloatSlider(min=self.x[0], max=self.x[-1], step = dX, description = 'Energy', value = dX, readout_format = ".2f")
+        self._SliderX = ipw.FloatSlider(min=self.energy[0], max=self.energy[-1], step = dX, description = 'Energy', value = dX, readout_format = ".2f")
+        self.interact_args = {"curve": self._SliderC, "energy": self._SliderX}
+        self._box1 = ipw.VBox([self._SliderC, self._SliderX ])
 
-        self._ButtonPlus = ipw.Button(descripton = "+")
+        self._ButtonPlus = ipw.Button(descripton = "Increase")
+        self._ButtonMinus = ipw.Button(descripton = "Decrease")
+        self._box2 = ipw.VBox([self._ButtonPlus, self._ButtonMinus])
         self._ButtonPlus.on_click(self._ButtonPlusCicked)
-
-        self._ButtonMinus = ipw.Button(descripton = "-")
         self._ButtonMinus.on_click(self._ButtonMinusCicked)
 
-        self._box1 = ipw.HBox([self._SliderC, self._SliderX, self._ButtonPlus, self._ButtonMinus])
+        self.markers_checkbox = ipw.Checkbox(value = False, description = "Markers")
+        self.legend_checkbox = ipw.Checkbox(value = False, description = "Legend")
+        self.interact_args.update({"markers": self.markers_checkbox, "legend": self.legend_checkbox})
+        self._box3 = ipw.VBox([self.markers_checkbox, self.legend_checkbox])
 
-        def plot(c, x):
-            Y = self.Data[int(c)-1][1]
-            fig, ax = plt.subplots(figsize = (8,5))
+        def plot(curve, energy, markers, legend):#, button_plus, button_minus):
+            Y = self.Data[int(curve)-1][1]
+            fig, ax = plt.subplots(figsize = (7,4))
 
-            if "OFF" in data.get("Parameter_values")[0][int(c)-1]: lcol = "tab:blue"
-            else: lcol = "tab:orange"
-            
-            ax.plot(self.x,Y, color = lcol)
-            ax.axvline(x = x, color = 'k', linestyle = "--")
-            ix = abs(x - self.x).argmin()
-            ax.axhline(y = Y[ix], color = 'k', linestyle = "--")
+            if "OFF" in data.get("Parameter_values")[0][int(curve)-1]:
+                lcol = "blue"
+                lbl = f"curve {curve:.0f}, off"
+            else: 
+                lcol = "red"
+                lbl = f"curve {curve:.0f}, on"
+            if self.markers_checkbox.value:
+                ax.plot(self.energy, Y, linestyle = "--", color = lcol, marker = "x", markersize = 5, linewidth = 0.6, label = lbl)
+            else:
+                ax.plot(self.energy, Y, linestyle = "-", color = lcol, label = lbl)
 
-        self._Interact = ipw.interactive_output(plot, {'c': self._SliderC, 'x': self._SliderX})
-        self._box_out = ipw.VBox([self._box1, self._Interact])
+            ax.plot(self.energy, Y, color = lcol)
+            ax.axvline(x = energy, color = 'k', linestyle = "--", linewidth = 0.6)
+            ix = abs(energy - self.energy).argmin()
+            ax.axhline(y = Y[ix], color = 'k', linestyle = "--", linewidth = 0.6)
+
+            if self.legend_checkbox.value: ax.legend()
+
+        self._Interact = ipw.interactive_output(plot, self.interact_args)
+        self._box_out = ipw.VBox([ipw.HBox([self._box1, self._box2, self._box3]), self._Interact])
         display(self._box_out)
 
     def _ButtonPlusCicked(self, b):
@@ -3414,7 +3634,8 @@ class MassageSpinEDC():
         x = self._SliderX.value
         ix = abs(x - self.Data[int(c)-1][0]).argmin()
         y = self.Data[int(c)-1][1][ix]
-        self.Data[int(c)-1][1][ix] = 0.975*y
+        self.Data[int(c)-1][1][ix] = 1.025*y
+        return 1
 
     def _ButtonMinusCicked(self, b):
         c = self._SliderC.value
@@ -3422,10 +3643,13 @@ class MassageSpinEDC():
         ix = abs(x - self.Data[int(c)-1][0]).argmin()
         y = self.Data[int(c)-1][1][ix]
         self.Data[int(c)-1][1][ix] = 0.975*y
+        return 1
 
-    def Get(self):
-        Parameter_values = self.data.get("Parameter_values", [])
-        intens1, intens2, n1, n2, intens1b, intens2b = np.zeros(len(self.x)), np.zeros(len(self.x)), 0, 0, [], []
+
+    def result(self):
+        result = deepcopy(self.data)
+        Parameter_values = result.get("Parameter_values", [])
+        intens1, intens2, n1, n2, intens1b, intens2b = np.zeros(len(self.energy)), np.zeros(len(self.energy)), 0, 0, [], []
         for i, p in enumerate(Parameter_values[0]):
             if "OFF" in p:
                 intens1 += self.Data[i][1]
@@ -3436,17 +3660,18 @@ class MassageSpinEDC():
                 intens2b.append(self.Data[i][1])
                 n2 += 1
         intens1, intens2 = np.array(intens1)/n1, np.array(intens2)/n2
-        asymmetry = np.zeros([len(self.x)])
-        for i in range(len(self.x)):
+        asymmetry = np.zeros([len(self.energy)])
+        for i in range(len(self.energy)):
             denom = (intens1[i] + intens2[i])
             if not denom == 0:
                 nom = (intens1[i] - intens2[i])
                 asymmetry[i] = (nom/denom)
             else:
                 asymmetry[i] = 0
-        self.data.update({"Data": self.Data, "int": intens1, "int_on": intens2, 
-            "int_all": intens1b, "int_all_on": intens2b, "asymmetry": asymmetry})
-        return self.data
+        global SHERMAN
+        result.update({"Data": self.Data, "int": intens1, "int_on": intens2, 
+            "int_all": intens1b, "int_all_on": intens2b, "asymmetry": asymmetry/SHERMAN})
+        return result
 
 
 
