@@ -84,6 +84,10 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 24.01.24    Added 'Analyer CCD' as a recognized alternative to 'PhoibosCCD'. 'Analyzer CCD' was added to our Prodigy installation
+                    during Robert's visit in January (2024).
+                    NOTE: Add 'Analyzer Intensity' and 'Analyzer Spin' as well a.s.a.p. 
+
 Version 23.12.16    Updated SpinEDC().
                     Updated MassageSpinEDC() (added some time ago but failed to update history then)
 
@@ -144,7 +148,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "23.12.17"
+__version__ = "24.01.24"
 __author__  = "Mats Leandersson"
 
 
@@ -166,7 +170,9 @@ except:
     print('Interactive plots will not work.\n\n' + Fore.BLACK)
 
 # ==============================================================================================
-print(Fore.LIGHTWHITE_EX + f"--- grumpy, version {__version__} (SAL X = ShiftX, SALY = -ShiftY, Asymmetry: negative polarity off - on.)" + Fore.BLACK)
+print(Fore.LIGHTWHITE_EX + f"grumpy, version {__version__}")
+print("  SAL X = ShiftX, SALY = -ShiftY, Asymmetry: negative polarity off - on.")
+print("  CCD: PhoibosCCD and AnalyzerCCD." + Fore.BLACK)
 # ==============================================================================================
 
 # Globals
@@ -183,7 +189,7 @@ defax_scattering_energy = 'scattering_energy'
 
 # ==============================================================================================
 
-
+CCD_ANALYZERS = ["PhoibosCCD", "AnalyzerCCD"]
 
 
 
@@ -197,6 +203,8 @@ def MeasurementType(data, shup = False, **kwargs):
     if not type(data) is dict:
         print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.BLACK); return
     
+    global CCD_ANALYZERS
+    
     Experiment = data.get('Experiment', {})
     
     Measurement_type = ''
@@ -205,9 +213,10 @@ def MeasurementType(data, shup = False, **kwargs):
     ANALYZER = Experiment.get('Analyzer', '')
     NON_ENERGY_ORDINATE = np.array(data.get('Non_Energy_Ordinate', np.array([])))
     PARAMETERS = data.get('Parameters', [])
+    
 
     # ARPES or XPS
-    if len(PARAMETERS) == 0 and ANALYZER == 'PhoibosCCD' and len(NON_ENERGY_ORDINATE) > 0:
+    if len(PARAMETERS) == 0 and ANALYZER in CCD_ANALYZERS and len(NON_ENERGY_ORDINATE) > 0:
         if abs(NON_ENERGY_ORDINATE.min()) < 1 and abs(NON_ENERGY_ORDINATE.max()) < 1:
             Measurement_type = 'XPS'
         else:
@@ -222,7 +231,7 @@ def MeasurementType(data, shup = False, **kwargs):
         Measurement_type = 'target_scattering_spectrum'
     
     # Fermi map
-    elif len(PARAMETERS) == 1 and ("SAL X [deg]" in PARAMETERS or "ShiftX [a.u.]" in PARAMETERS) and ANALYZER == 'PhoibosCCD':
+    elif len(PARAMETERS) == 1 and ("SAL X [deg]" in PARAMETERS or "ShiftX [a.u.]" in PARAMETERS) and ANALYZER in CCD_ANALYZERS:
         Measurement_type = 'fermi_map'
     
     # Deflector scattering scan
