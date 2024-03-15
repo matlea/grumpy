@@ -84,6 +84,9 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 24.03.15    Added kwargs to QuickSpin. Normalize the edc's to each other before calculating the asymmetry. Kwargs are norm = True,
+                    and norm_start_point and norm_points (e.g. 2 and 5 will use points 2 to 7 for normalization).
+
 Version 24.01.24    Added 'Analyer CCD' as a recognized alternative to 'PhoibosCCD'. 'Analyzer CCD' was added to our Prodigy installation
                     during Robert's visit in January (2024).
                     NOTE: Add 'Analyzer Intensity' and 'Analyzer Spin' as well a.s.a.p. 
@@ -2043,11 +2046,13 @@ def QuickSpin(D = {}, **kwargs):
             filter_outliers (LEGACY. Same as remove_spikes. Will be removed)
         plot (bool), figsize (tupple), linewidth (float), linestyle (str)
         shup (bool)
+        norm (bool, together with norm_pnts)
 
     """
     #
     recognized_kwargs = ['plot', 'shup', 'figsize', 'linewidth', 'linestyle', 'exclude', 'median_filter', 
-                         'size', 'mode', 'remove_spikes', 'filter_outliers', 'threshold', 'sherman']
+                         'size', 'mode', 'remove_spikes', 'filter_outliers', 'threshold', 'sherman',
+                         'norm', 'norm_start_point', 'norm_points']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     plot = kwargs.get('plot', True)
@@ -2063,6 +2068,13 @@ def QuickSpin(D = {}, **kwargs):
     if type(remove_spikes) is type(None):
         remove_spikes = kwargs.get('filter_outliers', False)        
     threshold = kwargs.get('threshold', 2)
+
+    norm = kwargs.get("norm", False)
+    norm_start_point = int(kwargs.get("norm_start_point", 0))
+    norm_points = (kwargs.get("norm_points", 5))
+    if norm:
+        if norm_start_point < 0: norm_start_point = 0
+        if norm_points <1: norm_points = 1  
 
     global SHERMAN
     sherman = kwargs.get('sherman', SHERMAN)
@@ -2111,6 +2123,9 @@ def QuickSpin(D = {}, **kwargs):
         edc_off = medianFilter(edc_off, size = size, mode = mode)
         edc_on =  medianFilter(edc_on, size = size, mode = mode)
         if not shup: print('Applied medianFilter()')
+    
+    if norm:
+        edc_on = edc_on / edc_on[norm_start_point:norm_start_point + norm_points].sum() * edc_off[norm_start_point:norm_start_point + norm_points].sum()
     
     if plot:
         ax[1].plot(energy, edc_off, linewidth = linewidth, color = 'tab:blue', label = 'pol. +', linestyle = linestyle)
