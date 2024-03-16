@@ -47,6 +47,8 @@ Main methods:
     QuickSpinMDC()
     Polarization()      Not checked after re-write.
     MergeSpinEDC()      Merge two spin edc data sets into one (merged_data = MergeSpinEDC(data1,data2))
+    SaveSpinEDC2File()  Save one or several spin edc data sets to text file.
+    RemoveSpinEDC()     Remove a specific curve from a spin edc dict.
 
     Explore()           For 2d and 3d data. Not quite ready but it works. Need to add option to rotate the images.
     ShiftAxis()
@@ -56,6 +58,8 @@ Main methods:
     PlotFitRes()        Plots fit results (also called by Plot() if needed).
     info()
     Info()
+    SaveARPES2File()
+    Save()
 
     AppendFEmaps()      An unsophiticated method to append two Fermi maps.
 
@@ -84,7 +88,13 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
-Version 24.03.15    Added kwargs to QuickSpin. Normalize the edc's to each other before calculating the asymmetry. Kwargs are norm = True,
+Version 24.03.16    Added SaveSpinEDC2File() (it seems like I already had made a ExportSpinEDC() method but this new one is different 
+                    as it saves all the individual spin edc's, while the previos one only saves the average intensities.)
+                    Added RemoveSpinEDC().
+                    Added SaveARPES2File().
+                    Started Save(). Save() is a method using other save-to-text methods. So far: SaveARPES2File() and SaveSpinEDC2File()
+
+Version 24.03.15    Added new kwargs to QuickSpin. Normalize the edc's to each other before calculating the asymmetry. Kwargs are norm = True,
                     and norm_start_point and norm_points (e.g. 2 and 5 will use points 2 to 7 for normalization).
 
 Version 24.01.24    Added 'Analyer CCD' as a recognized alternative to 'PhoibosCCD'. 'Analyzer CCD' was added to our Prodigy installation
@@ -151,7 +161,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "24.01.24"
+__version__ = "24.03.16"
 __author__  = "Mats Leandersson"
 
 
@@ -2027,9 +2037,6 @@ class SpinEDC():
 
 
 
-
-
-
  # ============================================================================================================   
 
 
@@ -3588,6 +3595,173 @@ def MergeSpinEDC(data1 = {}, data2 = {}):
 
 
 
+
+# ============================================================================================================ Save spin EDCs to file
+
+def SaveSpinEDC2File(data = [], file_name = "spin_edc.dat"):
+    """
+    Saves spin edc's to two text files (for negative polarity on and off) as columns, the first column being the energy.
+    Arguments:
+        data        A spin edc dict or a list of spin edc dicts.
+        file_name   The file name as a string. Eg. 'spin.dat' will generate two files: spin_off.dat and spin_on.dat.
+    """
+    if type(data) is dict: data = [data]
+    if not type(data) is list:
+        print(Fore.Red + "The argument data must be a list of (at least 1) spin edc dicts." + Fore.RESET); return
+    if len(data) == 0:
+        print(Fore.Red + "The argument data must be a list of (at least 1) spin edc dicts." + Fore.RESET); return
+    for i, d in enumerate(data):
+        if not type(d) is dict:
+            print(Fore.Red + f"Item {i+1} in argument data is not a dict." + Fore.RESET); return
+        if not d.get("Measurement_type") == "spin_edc":
+            print(Fore.Red + f"Item {i+1} in argument data is not spin edc dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.MAGENTA + "The argument file_name must be a str. Setting it to default 'spin_edc.dat'" + Fore.RESET)
+        file_name = "spin_edc.dat"
+    #
+    energy_axes = []
+    for d in data: energy_axes.append(d["x"])
+    e1, e2, el = energy_axes[0][0], energy_axes[0][-1], len(energy_axes[0])
+    for e in energy_axes:
+        if not (e[0] == e1 and e[-1] == e2 and len(e) == el):
+            print(Fore.Red + "Not all spin edc's have the same energy axis." + Fore.RESET); return
+    #
+    spectrum_id = []
+    for d in data:
+        spectrum_id.append(d.get("Experiment", {}).get("Spectrum_ID", "?"))
+    #
+    lens_modes, pass_energies = [], []
+    for d in data:
+        lens_modes.append(d.get("Experiment", {}).get("Lens_Mode", "?"))
+        pass_energies.append(d.get("Experiment", {}).get("Ep", "?"))
+    #
+    file_name_off = file_name.split(".")[0] + "_off." + file_name.split(".")[1]
+    file_name_on  = file_name.split(".")[0] + "_on."  + file_name.split(".")[1]
+    foff, fon = open(file_name_off, "w"), open(file_name_on, "w")
+    #
+    if len(spectrum_id) == 1:
+        if int(spectrum_id[0]) > 0:
+            foff.write(f"# spectrum id: {int(spectrum_id[0])}\n")
+            fon.write(f"# spectrum id: {int(spectrum_id[0])}\n")
+        else:
+            foff.write(f"# spectrum id: several scans combined into one.\n")
+            fon.write(f"# spectrum id: several scans combined into one.\n")
+    else:
+        foff.write(f"# spectrum id: {spectrum_id}\n")
+        fon.write(f"# spectrum id: {spectrum_id}\n") 
+    #
+    foff.write("# negative polarity: off\n")
+    fon.write("# negative polarity: on\n")
+    #
+    if len(lens_modes) == 1:
+        foff.write(f"# lens mode: {lens_modes[0]}\n")
+        fon.write(f"# lens mode: {lens_modes[0]}\n")
+    else:
+        if all(element == lens_modes[0] for element in lens_modes):
+            foff.write(f"# lens mode: {lens_modes[0]}\n")
+            fon.write(f"# lens mode: {lens_modes[0]}\n")
+        else:
+            print(Fore.MAGENTA + "Note: Different lens_modes were used." + Fore.RESET)
+            foff.write(f"# lens mode: {lens_modes}\n")
+            fon.write(f"# lens mode: {lens_modes}\n")
+    if len(pass_energies) == 1:
+        foff.write(f"# pass energy: {pass_energies[0]}\n")
+        fon.write(f"# pass energy: {pass_energies[0]}\n")
+    else:
+        if all(element == pass_energies[0] for element in pass_energies):
+            foff.write(f"# pass energy: {pass_energies[0]}\n")
+            fon.write(f"# pass energy: {pass_energies[0]}\n")
+        else:
+            print(Fore.MAGENTA + "Note: Different pass energies were used." + Fore.RESET)
+            foff.write(f"# pass energy: {pass_energies}\n")
+            fon.write(f"# pass energy: {pass_energies}\n")
+    del lens_modes, pass_energies
+    #
+    ENERGY = data[0]["x"]
+    CURVES_OFF, CURVES_ON = [], []
+    for D in data:
+        for curve in D["int_all"]: CURVES_OFF.append(curve)
+        for curve in D["int_all_on"]: CURVES_ON.append(curve)
+
+    CURVES_OFF, CURVES_ON = np.array(CURVES_OFF), np.array(CURVES_ON)
+    for i in range(len(ENERGY)-1):
+        rowoff, rowon = f"{ENERGY[i]:.2f}", f"{ENERGY[i]:.2f}"
+        for j in range(len(CURVES_OFF)):
+            rowoff = f"{rowoff}\t{CURVES_OFF[j][i]:.1f}"
+        for j in range(len(CURVES_ON)):
+            rowon = f"{rowon}\t{CURVES_ON[j][i]:.1f}"
+        foff.write(f"{rowoff}\n")
+        fon.write(f"{rowon}\n")
+    foff.close()
+    fon.close()
+    print(Fore.BLUE + f"Data saved to {file_name_off} and {file_name_on}." + Fore.RESET)
+
+
+
+
+
+# ============================================================================================================ 
+
+def RemoveSpinEDC(data = {}, edc_number = -1):
+    """
+    Remove a specific curve from the data. Returns a new data dict.
+    Arguments:
+        data        Spin edc dict
+
+    """
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a spin edc dict." + Fore.RESET); return data
+    if not data.get("Measurement_type") == "spin_edc":
+        print(Fore.RED + "Argument data must be a spin edc dict." + Fore.RESET); return data
+    try: edc_number = int(edc_number)
+    except:
+        print(Fore.RED + "Argument edc_number must be an integer." + Fore.RESET); return data
+    num_curves = len(data.get("Data", -1))
+    if edc_number >= num_curves or edc_number < 0:
+        print(Fore.RED + f"Argument edc_number must be an integer from 0 to {num_curves - 1}." + Fore.RESET); return data
+    #
+    Data, Parameter_values, int_all, int_all_on = [],  [], [], []
+    intensity = np.zeros([len(data["x"])])
+    intensity_on = np.zeros([len(data["x"])])
+    ion, ioff = 0, 0
+    for i, curve in enumerate(data["Data"]):
+        if not i == edc_number:
+            Data.append(curve)
+            Parameter_values.append(data["Parameter_values"][0][i])
+            if "OFF" in Parameter_values[-1]:
+                int_all.append(curve[1])
+                intensity += curve[1]
+                ioff += 1
+            else:
+                int_all_on.append(curve[1])
+                intensity_on += curve[1]
+                ion += 1
+    if ioff > 0: intensity = intensity/ioff
+    if ion > 0: intensity_on = intensity_on/ion
+    #
+    asymmetry = np.zeros([len(intensity)])
+    for i in range(len(intensity)):
+        denom = (intensity[i] + intensity_on[i])
+        if not denom == 0:
+            nom = (intensity[i] - intensity_on[i])
+            asymmetry[i] = (nom/denom)
+        else:
+            asymmetry[i] = 0
+    #
+    newDict = deepcopy(data)
+    newDict.update({"Data": Data})
+    newDict.update({"Parameter_values": [Parameter_values]})
+    newDict.update({"int": intensity})
+    newDict.update({"int_on": intensity_on})
+    newDict.update({"int_all": int_all})
+    newDict.update({"int_all_on": int_all_on})
+    newDict.update({"asymmetry": asymmetry})
+    return newDict
+
+
+
+
+
 # ============================================================================================================
 
 class MassageSpinEDC():
@@ -3696,6 +3870,80 @@ class MassageSpinEDC():
         result.update({"Data": self.Data, "int": intens1, "int_on": intens2, 
             "int_all": intens1b, "int_all_on": intens2b, "asymmetry": asymmetry/SHERMAN})
         return result
+
+
+
+
+
+
+
+# ============================================================================================================
+# ============================================================================================================ S A V E to T E X T
+# ============================================================================================================
+
+def Save(data = {}, file_name = "data.dat", **kwargs):
+    """
+    """
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.RED + "Argument file_name must be a string." + Fore.RESET); return
+    #
+    Measurement_type = data.get("Measurement_type", "")
+    
+    # ----------------------- spin edc
+    if Measurement_type == "spin_edc":
+        SaveSpinEDC2File(data = data, file_name = file_name)
+        return
+
+    # ----------------------- arpes
+    elif Measurement_type == "ARPES":
+        SaveARPES2File(data = data, file_name = file_name)
+
+
+
+
+
+def SaveARPES2File(data = {}, file_name = "data.dat", **kwargs):
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.RED + "Argument file_name must be a string." + Fore.RESET); return
+    if not data.get("Measurement_type", "") == "ARPES":
+        print(Fore.RED + "Argument data does not contain ARPES data." + Fore.RESET); return
+    #
+    fn_e = file_name.split(".")[0] + "_energy." + file_name.split(".")[1]
+    fn_a = file_name.split(".")[0] + "_angle." + file_name.split(".")[1]
+    fn_i = file_name.split(".")[0] + "_intensity." + file_name.split(".")[1]
+    f_e, f_a, f_i = open(fn_e, "w"), open(fn_a, "w"), open(fn_i, "w")
+    F = [f_e, f_a, f_i]
+    #
+    F[0].write("# data: ARPES, energy axis\n")
+    F[0].write(f"# label: {data.get('Meta', {}).get('x_label', '?')}\n")
+    F[1].write("# data: ARPES, angle axis\n")
+    F[1].write(f"# label: {data.get('Meta', {}).get('y_label', '?')}\n")
+    F[2].write("# data: ARPES, intensity\n")
+    F[2].write(f"# label: {data.get('Meta', {}).get('int_label', '?')}\n")
+    for f in F: f.write(f"# spectrum id: {data.get('Experiment', {}).get('Spectrum_ID', '?')}\n")
+    for f in F: f.write(f"# lens mode: {data.get('Experiment', {}).get('Lens_Mode', '?')}\n")
+    for f in F: f.write(f"# scan mode: {data.get('Experiment', {}).get('Scan_Mode', '?')}\n")
+    for f in F: f.write(f"# dwell time: {data.get('Experiment', {}).get('Dwell_Time', '?')}\n")
+    for f in F: f.write(f"# photon energy: {data.get('Experiment', {}).get('Excitation_Energy', '?')}\n")
+    for f in F: f.write(f"# kinetic energy: {data.get('Experiment', {}).get('Kinetic_Energy', '?')}\n")
+    for f in F: f.write(f"# pass energy: {data.get('Experiment', {}).get('Pass_Energy', '?')}\n")
+    #
+    for x in data.get("x"): F[0].write(f"{x:7.3f}\n")
+    F[0].close()
+    for y in data.get("y"): F[1].write(f"{y:7.3f}\n")
+    F[1].close()
+    #
+    for I in data.get("int"):
+        row = f"{I[0]:.5e}"
+        for index, i in enumerate(I):
+            if index> 0: row = f"{row}\t{i:.5e}"
+        F[2].write(f"{row}\n")
+    F[2].close()
+
 
 
 
