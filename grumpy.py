@@ -47,7 +47,6 @@ Main methods:
     QuickSpinMDC()
     Polarization()      Not checked after re-write.
     MergeSpinEDC()      Merge two spin edc data sets into one (merged_data = MergeSpinEDC(data1,data2))
-    SaveSpinEDC2File()  Save one or several spin edc data sets to text file.
     RemoveSpinEDC()     Remove a specific curve from a spin edc dict.
 
     Explore()           For 2d and 3d data. Not quite ready but it works. Need to add option to rotate the images.
@@ -58,7 +57,9 @@ Main methods:
     PlotFitRes()        Plots fit results (also called by Plot() if needed).
     info()
     Info()
+    SaveSpinEDC2File()  Save one or several spin edc data sets to text file.
     SaveARPES2File()
+    SaveFermiMap2File()
     Save()
 
     AppendFEmaps()      An unsophiticated method to append two Fermi maps.
@@ -87,6 +88,8 @@ Notes:
 --- 
 
 Version history (from 23.05.15 and onwards):
+
+Version 24.03.17    Added SaveFermiMap2File() and included it into Save().
 
 Version 24.03.16    Added SaveSpinEDC2File() (it seems like I already had made a ExportSpinEDC() method but this new one is different 
                     as it saves all the individual spin edc's, while the previos one only saves the average intensities.)
