@@ -3899,12 +3899,66 @@ def Save(data = {}, file_name = "data.dat", **kwargs):
     # ----------------------- arpes
     elif Measurement_type == "ARPES":
         SaveARPES2File(data = data, file_name = file_name)
+    
+    # ----------------------- fermi map
+    elif Measurement_type == "fermi_map":
+        SaveFermiMap2File(data = data, file_name = file_name)
+
+
+
+def SaveFermiMap2File(data = {}, file_name = "data.dat"):
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.RED + "Argument file_name must be a string." + Fore.RESET); return
+    if not data.get("Measurement_type", "") == "fermi_map":
+        print(Fore.RED + "Argument data does not contain Fermi map data." + Fore.RESET); return
+    #
+    fn_e = file_name.split(".")[0] + "_energy." + file_name.split(".")[1]
+    fn_a = file_name.split(".")[0] + "_angle." + file_name.split(".")[1]
+    fn_x = file_name.split(".")[0] + "_shiftx." + file_name.split(".")[1]
+    fn_i = file_name.split(".")[0] + "_intensity." + file_name.split(".")[1]
+    f_e, f_a, f_x, f_i = open(fn_e, "w"), open(fn_a, "w"), open(fn_x, "w"), open(fn_i, "w")
+    F = [f_e, f_a, f_x, f_i]
+    #
+    F[0].write("# data: Fermi map, energy axis\n")
+    F[0].write(f"# label: {data.get('Meta', {}).get('x_label', '?')}\n")
+    F[1].write("# data: Fermi map, angle axis\n")
+    F[1].write(f"# label: {data.get('Meta', {}).get('y_label', '?')}\n")
+    F[2].write("# data: Fermi map, ShiftX\n")
+    F[2].write(f"# label: {data.get('Meta', {}).get('z_label', '?')}\n")
+    F[2].write("# data: Fermi map, intensity\n")
+    F[2].write(f"# label: {data.get('Meta', {}).get('int_label', '?')}\n")
+    for f in F: f.write(f"# spectrum id: {data.get('Experiment', {}).get('Spectrum_ID', '?')}\n")
+    for f in F: f.write(f"# lens mode: {data.get('Experiment', {}).get('Lens_Mode', '?')}\n")
+    for f in F: f.write(f"# scan mode: {data.get('Experiment', {}).get('Scan_Mode', '?')}\n")
+    for f in F: f.write(f"# dwell time: {data.get('Experiment', {}).get('Dwell_Time', '?')}\n")
+    for f in F: f.write(f"# photon energy: {data.get('Experiment', {}).get('Excitation_Energy', '?')}\n")
+    for f in F: f.write(f"# kinetic energy: {data.get('Experiment', {}).get('Kinetic_Energy', '?')}\n")
+    for f in F: f.write(f"# pass energy: {data.get('Experiment', {}).get('Pass_Energy', '?')}\n")
+    F[3].write("#\n")
+    lx, ly, le = len(data.get("z")), len(data.get("y")), len(data.get("x"))
+    F[3].write(f"# The data is stored in one column of length {lx*ly*le}. Reshape it into \n")
+    F[3].write(f"# a 3d array of shape (ShiftX = {lx}, SlitY = {ly}, E = {le}).\n#\n")
+    #
+    for x in data.get("x"): F[0].write(f"{x:7.3f}\n")
+    F[0].close()
+    for y in data.get("y"): F[1].write(f"{y:7.3f}\n")
+    F[1].close()
+    for z in data.get("z"): F[2].write(f"{z:7.3f}\n")
+    F[2].close()
+    #
+    for i in range(len(data.get("z"))):
+        F[3].write(f"# slice {i}, ShiftX = {data.get("z")[i]}\n")
+        np.savetxt(F[3], data.get("int")[i,:,:].flatten(), fmt='%-.5e')
+    F[3].close()
 
 
 
 
 
-def SaveARPES2File(data = {}, file_name = "data.dat", **kwargs):
+
+def SaveARPES2File(data = {}, file_name = "data.dat"):
     if not type(data) is dict:
         print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
     if not type(file_name) is str:
