@@ -60,7 +60,9 @@ Main methods:
     SaveSpinEDC2File()  Save one or several spin edc data sets to text file.
     SaveARPES2File()
     SaveFermiMap2File()
-    Save()
+    SaveTargetScatteringSpectrum2File()
+    SaveXPS2File()
+    Save()              Generic method for all the Save...() methods above.
 
     AppendFEmaps()      An unsophiticated method to append two Fermi maps.
 
@@ -89,7 +91,9 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
-Version 24.03.17    Added SaveFermiMap2File() and included it into Save().
+Version 24.03.18    Added more save-to-file methods (SaveXPS2File() and SaveTargetScatteringSpectrum2File()) and included them in Save().
+
+Version 24.03.17    Added SaveFermiMap2File() and included it in Save().
 
 Version 24.03.16    Added SaveSpinEDC2File() (it seems like I already had made a ExportSpinEDC() method but this new one is different 
                     as it saves all the individual spin edc's, while the previos one only saves the average intensities.)
@@ -164,7 +168,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "24.03.16"
+__version__ = "24.03.18"
 __author__  = "Mats Leandersson"
 
 
@@ -3906,6 +3910,66 @@ def Save(data = {}, file_name = "data.dat", **kwargs):
     # ----------------------- fermi map
     elif Measurement_type == "fermi_map":
         SaveFermiMap2File(data = data, file_name = file_name)
+    
+    # ----------------------- XPS
+    elif Measurement_type == "XPS":
+        SaveXPS2File(data = data, file_name = file_name)
+    
+    # ----------------------- scattering spectra
+    elif Measurement_type == "target_scattering_spectrum":
+        SaveTargetScatteringSpectrum2File(data = data, file_name = file_name)
+    
+    # ----------------------- else
+    else:
+        print(Fore.MAGENTA + "It appears that this kind of measurement data is not yet possible to save to file. Stay tuned for updates." + Fore.RESET)
+
+
+def SaveTargetScatteringSpectrum2File(data = {}, file_name = "data.dat"):
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.RED + "Argument file_name must be a string." + Fore.RESET); return
+    if not data.get("Measurement_type", "") == "XPS":
+        print(Fore.RED + "Argument data does not contain XPS data." + Fore.RESET); return
+    #
+    f = open(file_name, "w")
+    f.write("# data: target scattering spectrum\n")
+    f.write(f"# label x: {data.get('Meta', {}).get('x_label', '?')}\n")
+    f.write(f"# label y: {data.get('Meta', {}).get('int_label', '?')}\n")
+    f.write(f"# spectrum id: {data.get('Experiment', {}).get('Spectrum_ID', '?')}\n")
+    f.write(f"# lens mode: {data.get('Experiment', {}).get('Lens_Mode', '?')}\n")
+    f.write(f"# scan mode: {data.get('Experiment', {}).get('Scan_Mode', '?')}\n")
+    f.write(f"# dwell time: {data.get('Experiment', {}).get('Dwell_Time', '?')}\n")
+    f.write(f"# photon energy: {data.get('Experiment', {}).get('Excitation_Energy', '?')}\n")
+    f.write(f"# kinetic energy: {data.get('Experiment', {}).get('Kinetic_Energy', '?')}\n")
+    f.write(f"# pass energy: {data.get('Experiment', {}).get('Pass_Energy', '?')}\n")
+    for i, x in data.get("x"): f.write(f"{x:7.3f}\t{data.get('int')[i]:.5e}\n")
+    f.close()
+
+
+
+
+def SaveXPS2File(data = {}, file_name = "data.dat"):
+    if not type(data) is dict:
+        print(Fore.RED + "Argument data must be a dict." + Fore.RESET); return
+    if not type(file_name) is str:
+        print(Fore.RED + "Argument file_name must be a string." + Fore.RESET); return
+    if not data.get("Measurement_type", "") == "XPS":
+        print(Fore.RED + "Argument data does not contain XPS data." + Fore.RESET); return
+    #
+    f = open(file_name, "w")
+    f.write("# data: XPS\n")
+    f.write(f"# label x: {data.get('Meta', {}).get('x_label', '?')}\n")
+    f.write(f"# label y: {data.get('Meta', {}).get('int_label', '?')}\n")
+    f.write(f"# spectrum id: {data.get('Experiment', {}).get('Spectrum_ID', '?')}\n")
+    f.write(f"# lens mode: {data.get('Experiment', {}).get('Lens_Mode', '?')}\n")
+    f.write(f"# scan mode: {data.get('Experiment', {}).get('Scan_Mode', '?')}\n")
+    f.write(f"# dwell time: {data.get('Experiment', {}).get('Dwell_Time', '?')}\n")
+    f.write(f"# photon energy: {data.get('Experiment', {}).get('Excitation_Energy', '?')}\n")
+    f.write(f"# kinetic energy: {data.get('Experiment', {}).get('Kinetic_Energy', '?')}\n")
+    f.write(f"# pass energy: {data.get('Experiment', {}).get('Pass_Energy', '?')}\n")
+    for i, x in data.get("x"): f.write(f"{x:7.3f}\t{data.get('int')[i]:.5e}\n")
+    f.close()
 
 
 
