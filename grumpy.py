@@ -91,7 +91,8 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
-Version 24.03.18    Added more save-to-file methods (SaveXPS2File() and SaveTargetScatteringSpectrum2File()) and included them in Save().
+Version 24.03.18b   Added more save-to-file methods (SaveXPS2File() and SaveTargetScatteringSpectrum2File()) and included them in Save().
+                    Changed all Fore.BLACK to Fore.RESET.
 
 Version 24.03.17    Added SaveFermiMap2File() and included it in Save().
 
@@ -187,12 +188,12 @@ try:
     from IPython.display import display
 except: 
     print(Fore.RED + '(\nCould not import the ipywidget module and/or display from IPython.display.') 
-    print('Interactive plots will not work.\n\n' + Fore.BLACK)
+    print('Interactive plots will not work.\n\n' + Fore.RESET)
 
 # ==============================================================================================
 print(Fore.LIGHTWHITE_EX + f"grumpy, version {__version__}")
 print("  SAL X = ShiftX, SALY = -ShiftY, Asymmetry: negative polarity off - on.")
-print("  CCD: PhoibosCCD and AnalyzerCCD." + Fore.BLACK)
+print("  CCD: PhoibosCCD and AnalyzerCCD." + Fore.RESET)
 # ==============================================================================================
 
 # Globals
@@ -221,7 +222,7 @@ CCD_ANALYZERS = ["PhoibosCCD", "AnalyzerCCD"]
 
 def MeasurementType(data, shup = False, **kwargs):
     if not type(data) is dict:
-        print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.BLACK); return
+        print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.RESET); return
     
     global CCD_ANALYZERS
     
@@ -313,10 +314,10 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
     except: nshup = False
 
     if not type(file_name) is str or not type(path) is str:
-        print(Fore.RED + "Args file_name and path must be strings." + Fore.BLACK)
+        print(Fore.RED + "Args file_name and path must be strings." + Fore.RESET)
         return {}
     if file_name == '':
-        print(Fore.RED + "Arg file_name can not be an empty string." + Fore.BLACK)
+        print(Fore.RED + "Arg file_name can not be an empty string." + Fore.RESET)
         return {}
     if not file_name.lower().endswith('xy'): file_name = f"{file_name}.xy"
     File.update({'file_name': file_name})
@@ -334,7 +335,7 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
         File.update({'file_exists': True})
     except:
         File.update({'file_exists': False})
-        print(Fore.RED + 'Could not find/open the file.' + Fore.BLACK)
+        print(Fore.RED + 'Could not find/open the file.' + Fore.RESET)
         return {}
 
     # ============= READ HEADER
@@ -676,7 +677,7 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
         if type(doFilter) is type(None):
             doFilter = kwargs.get('filter_outliers', None)
             if not type(doFilter) is type(None):
-                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.BLACK)
+                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.RESET)
         if doFilter:
             threshold = kwargs.get('threshold', 1.2)
             edc_off_avg = removeSpikes(edc_off_avg, threshold)
@@ -761,7 +762,7 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
         if type(doFilter) is type(None):
             doFilter = kwargs.get('filter_outliers', None)
             if not type(doFilter) is type(None):
-                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.BLACK)
+                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.RESET)
         if doFilter:
             threshold = kwargs.get('threshold', 1.2)
             edc_off_avg = filterOutliers(edc_off_avg, threshold)
@@ -844,7 +845,7 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
         if type(doFilter) is type(None):
             doFilter = kwargs.get('filter_outliers', None) # legacy argument
             if not type(doFilter) is type(None):
-                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.BLACK)
+                print(Fore.LIGHTRED_EX + "(Note: in the future use arg. remove_spikes instead of filter_outliers.)"+ Fore.RESET)
 
         if doFilter:
             threshold = kwargs.get('threshold', 1.2)
@@ -887,7 +888,7 @@ def Load(file_name = '', path = '', shup = True, **kwargs):
 
 def info(D = {}):
     """"""
-    RED = Fore.RED; BLU = Fore.BLUE; BLK = Fore.BLACK
+    RED = Fore.RED; BLU = Fore.BLUE; BLK = Fore.RESET
     if not type(D) is dict: 
         print(f'{RED}Argument D must be a grumpy dict.{BLK}'); return
     if D.get('Experiment', {}) == {}:
@@ -916,7 +917,7 @@ def info(D = {}):
 def Info(D = {}):
     """"""
     RED = Fore.RED
-    BLK = Fore.BLACK
+    BLK = Fore.RESET
     BLU = Fore.BLUE
     if not type(D) is dict: 
         print(RED + 'Argument D must be a grumpy dict.'+ BLK); return
@@ -959,7 +960,7 @@ def Info(D = {}):
         shp = np.shape(D.get('int'))
     else:
         shp = "value = {0}".format(D.get('int'))
-    print('int:                {0}'.format(shp) + Fore.BLACK)
+    print('int:                {0}'.format(shp) + Fore.RESET)
     print(BLK)
 
     
@@ -1018,11 +1019,11 @@ def SubArray(D = {}, shup = False, **kwargs):
     Instead of values x1, x2, y1, ..., z2 you can use indices ix1, ix2, iy1, ..., iz2.
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.RESET); return D
     #
     av_axes = _getAxes(D)
     if len(av_axes) == 0:
-        print(Fore.RED + 'Could not find any axes in the dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Could not find any axes in the dict.' + Fore.RESET); return D
     #
     recognized_kwargs = ['x1', 'x2', 'ix1', 'ix2', 'y1', 'y2', 'iy1', 'iy2', 'z1', 'z2', 'iz1', 'iz2']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
@@ -1035,7 +1036,7 @@ def SubArray(D = {}, shup = False, **kwargs):
     iz1 = kwargs.get('iz1');    iz2 = kwargs.get('iz2')
     #
     if type(D.get('int')) is None:
-        print(Fore.RED + "There is no intensity data in the dict." + Fore.BLACK); return D
+        print(Fore.RED + "There is no intensity data in the dict." + Fore.RESET); return D
     # 
     DD = copy.deepcopy(D)
     #
@@ -1072,7 +1073,7 @@ def SubArray(D = {}, shup = False, **kwargs):
             DD.update({'asymmetry': DD.get('asymmetry')[ix1:ix2+1]})
         # deflector spin
         else:
-            print(Fore.RED + 'Deflector spin not implemented yet.' + Fore.BLACK); return D
+            print(Fore.RED + 'Deflector spin not implemented yet.' + Fore.RESET); return D
             
     #
     if not shup:
@@ -1097,22 +1098,22 @@ def Compact(D = {}, axis = '', shup = False, **kwargs):   # rewritten
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy dict.'+ Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy dict.'+ Fore.RESET); return D
     #
     av_axes = _getAxes(D)
     if len(av_axes) == 0:
-        print(Fore.RED + 'Could not find any axes in the dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Could not find any axes in the dict.' + Fore.RESET); return D
     #
     if D.get('Type').startswith('spin'):
-        print(Fore.RED + 'Compact does not work with spin data yet.' + Fore.BLACK); return D
+        print(Fore.RED + 'Compact does not work with spin data yet.' + Fore.RESET); return D
     #
     axis = axis.lower()
     if not axis in list(np.transpose(av_axes)[0]):
-        print(Fore.RED + "Axis {0} is not found in the dict.".format(axis) + Fore.BLACK); return D
+        print(Fore.RED + "Axis {0} is not found in the dict.".format(axis) + Fore.RESET); return D
     #
     Int = D.get('int')
     if type(Int) is None:
-        print(Fore.RED + "There is no intensity data in the dict." + Fore.BLACK); return D
+        print(Fore.RED + "There is no intensity data in the dict." + Fore.RESET); return D
     # 
     DD = copy.deepcopy(D)
     Meta = copy.deepcopy(DD.get('Meta', {}))
@@ -1207,7 +1208,7 @@ def Profile(D = {}, **kwargs):
     z1, z2  z-limits, optional
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.RESET); return D
     #
     recognized_kwargs = ['axis', 'x1', 'x2', 'y1', 'y2', 'z1', 'z2']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
@@ -1219,14 +1220,14 @@ def Profile(D = {}, **kwargs):
     #
     axes_info = _getAxes(D = D)
     if len(axes_info) == 0:
-        print(Fore.RED + 'Can not find any axes in argument D.' + Fore.BLACK); return D
+        print(Fore.RED + 'Can not find any axes in argument D.' + Fore.RESET); return D
     axes = list(np.transpose(axes_info))[0]
     #
     if axis == '':
-        print(Fore.RED + 'Argument axis must be one of the following: {0}'.format(axes) + Fore.BLACK); return D
+        print(Fore.RED + 'Argument axis must be one of the following: {0}'.format(axes) + Fore.RESET); return D
     #
     if not axis in axes:
-        print(Fore.RED + 'Argument axis must be one of the following: {0}'.format(axes) + Fore.BLACK); return D
+        print(Fore.RED + 'Argument axis must be one of the following: {0}'.format(axes) + Fore.RESET); return D
     #
     ntp = type(None)
     DD = copy.deepcopy(D)
@@ -1263,12 +1264,12 @@ def ShiftAxis(D = {}, axis = '', v = 0, shup = False, **kwargs):
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.RESET); return D
     #
     axes_info = _getAxes(D = D)
     axes = list(np.transpose(axes_info))[0]
     if not axis in axes:
-        print(Fore.RED + "axis '{0}' is not found in this grumpy dict.".format(axis) + Fore.BLACK); return D
+        print(Fore.RED + "axis '{0}' is not found in this grumpy dict.".format(axis) + Fore.RESET); return D
     #
     B = copy.deepcopy(D)
     B.update({axis: np.array(B.get(axis)) + v})
@@ -1307,7 +1308,7 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
                             deflector_spin_edc_2,   values: 'asym', 'onoff', 'on', 'off'
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy dict.'+ Fore.BLACK); return ax
+        print(Fore.RED + 'Argument D must be a grumpy dict.'+ Fore.RESET); return ax
 
     
     # kwargs ----------
@@ -1488,7 +1489,7 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
         print('Too many axes for this poor method.'); return ax
         
     else:
-        print(Fore.RED + 'The data is not recognized by this method. Plot it yourself.' + Fore.BLACK)
+        print(Fore.RED + 'The data is not recognized by this method. Plot it yourself.' + Fore.RESET)
     
     # do some kwarg stuff
     if not type(kw_axvline) is list:
@@ -1521,12 +1522,12 @@ def PlotFermiMap(D = {}, **kwargs):
     Interactive plot of 3d data (energy, angle, x delflection).
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be of type grumpy dict.' + Fore.BLACK); return
+        print(Fore.RED + 'Argument D must be of type grumpy dict.' + Fore.RESET); return
     Type = D.get('Measurement_type', '')
     if not Type == 'fermi_map':
         Type = D.get('Type', '')
         if not Type == 'fermi_map':
-            print(Fore.RED + 'The data in the dict is not a Fermi map.' + Fore.BLACK); return
+            print(Fore.RED + 'The data in the dict is not a Fermi map.' + Fore.RESET); return
     
     recognized_kwargs = ['figsize', 'cmap', 'linewidth']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
@@ -1614,20 +1615,20 @@ def PlotFermiMap(D = {}, **kwargs):
 
 def Explore(D = {}, **kwargs):
     """"""
-    if not type(D) is dict: print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.BLACK); return
+    if not type(D) is dict: print(Fore.RED + 'Argument D must be a grumpy dict.' + Fore.RESET); return
     #
     recognized_kwargs = ['']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     dim = len(np.shape(D.get('int', np.array([]))))
     if dim < 2:
-        print(Fore.RED + 'The data seem to be have too few dimensions. This method requires at least two axes.' + Fore.BLACK); return
+        print(Fore.RED + 'The data seem to be have too few dimensions. This method requires at least two axes.' + Fore.RESET); return
     elif dim == 2: 
         _Explore2d(D = D, **kwargs)
     elif dim == 3:
         _Explore3d(D = D, **kwargs)
     else:
-        print(Fore.RED + 'The data seem to be have too many dimensions. This method handles maximum three axes.' + Fore.BLACK); return
+        print(Fore.RED + 'The data seem to be have too many dimensions. This method handles maximum three axes.' + Fore.RESET); return
 
 
 def _Explore2d(D = {}, **kwargs):
@@ -1896,12 +1897,12 @@ class SpinEDC():
     """
     def __init__(self, data = {}, s = None):
         if not type(data) is dict:
-            print(Fore.RED + 'Argument data must a grumpy dict.' + Fore.BLACK); return
+            print(Fore.RED + 'Argument data must a grumpy dict.' + Fore.RESET); return
         if not data.get('Type', '') == 'spin_edc':
-            print(Fore.RED + 'The dicts does not contain spin edc data.' + Fore.BLACK); return
+            print(Fore.RED + 'The dicts does not contain spin edc data.' + Fore.RESET); return
         #
         print(Fore.BLUE + "Deselect edcs you don't want to use. Normalize the edcs at a certain energy.")
-        print("Export the result (to a new dict) using the SpinEDC.result() method.\n" + Fore.BLACK)
+        print("Export the result (to a new dict) using the SpinEDC.result() method.\n" + Fore.RESET)
         #
         if type(s) is type(None):
             global SHERMAN
@@ -2096,9 +2097,9 @@ def QuickSpin(D = {}, **kwargs):
     shup = kwargs.get('shup', False)
     #
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must a grumpy dict.' + Fore.BLACK); return {}
+        print(Fore.RED + 'Argument D must a grumpy dict.' + Fore.RESET); return {}
     if not D.get('Type', '') == 'spin_edc':
-        print(Fore.RED + 'The dicts does not contain spin edc data.' + Fore.BLACK); return D
+        print(Fore.RED + 'The dicts does not contain spin edc data.' + Fore.RESET); return D
 
     EDC_OFF = D.get('int_all')
     EDC_ON = D.get('int_all_on')
@@ -2194,9 +2195,9 @@ def QuickSpinMDC(D = {}, **kwargs):
         
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must a grumpy dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must a grumpy dict.' + Fore.RESET); return D
     if not D.get('Type', '').startswith('spin_deflector'):
-        print(Fore.RED + 'The dicts does not contain deflector spin data.' + Fore.BLACK); return D
+        print(Fore.RED + 'The dicts does not contain deflector spin data.' + Fore.RESET); return D
     #
     recognized_kwargs = ['plot', 'shup', 'median_filter_edc', 'size', 'mode', 'remove_spikes', 'filter_outliers',
                         'threshold', 'sherman', 'figsize', 'linewidth', 'linestyle', 'vmin', 'vmax', 'vmina',
@@ -2243,7 +2244,7 @@ def QuickSpinMDC(D = {}, **kwargs):
         direction = 'xy'
         defl_axis = np.array(range(len(edc_off)))
     else:
-        print(Fore.RED + 'Probably most likely there is potentially some sloppy coding involved here. Sorry. Aborting.' + Fore.BLACK); return {}        
+        print(Fore.RED + 'Probably most likely there is potentially some sloppy coding involved here. Sorry. Aborting.' + Fore.RESET); return {}        
 
     # energy is an array with one vaule if fixed energy, otherwise several values
     if len(energy) == 1: EDC = False
@@ -2394,12 +2395,12 @@ def Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'n
     for d in D: types.append(d.get('Type', 'none'))
     #
     if all(x=='none' for x in types):
-        print(Fore.GREEN + 'Please use help(grumpy.Polarization).' + Fore.BLACK)
+        print(Fore.GREEN + 'Please use help(grumpy.Polarization).' + Fore.RESET)
         return {}
     for i,t in enumerate(types):
         if not t == 'none' and not t in allowed_types: types[i] = 'wrong'
     if any(x=='wrong' for x in types):
-        print(Fore.RED + 'One or more of the passed data dicts are of the wrong measurement types for this method.' + Fore.BLACK)
+        print(Fore.RED + 'One or more of the passed data dicts are of the wrong measurement types for this method.' + Fore.RESET)
         return {}
     #
     Case = ''
@@ -2410,7 +2411,7 @@ def Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'n
     elif not types[2] == 'none':                                        # Pz
         Case = 'Pz'
     else:
-        print(Fore.GREEN + 'For just one data set with coil 2 use QuickSpin() or QuickSpinMDC().' + Fore.BLACK)
+        print(Fore.GREEN + 'For just one data set with coil 2 use QuickSpin() or QuickSpinMDC().' + Fore.RESET)
     #
     if Case in ['Pxyz', 'Pxy']: j = 0
     else: j = 2
@@ -2694,9 +2695,9 @@ def PlotFitRes(D = {}, ax = None, **kwargs):
     Additional arguments: only_fit, fit_density, marker_color, line_color, data_label, fit_label
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a dict containing fit results.' + Fore.BLACK); return
+        print(Fore.RED + 'Argument D must be a dict containing fit results.' + Fore.RESET); return
     if not('yfit' in D and 'par' in D and 'method' in D):
-        print(Fore.RED + 'Argument D must be a dict containing fit results.' + Fore.BLACK); return
+        print(Fore.RED + 'Argument D must be a dict containing fit results.' + Fore.RESET); return
     #
     recognized_kwargs = ['figsize', 'xlabel', 'ylabel', 'title', 'only_fit', 'marker', 's', 'fit_density',
                         'marker_color', 'line_color', 'linewidth', 'linestyle', 'data_label', 'fit_label']
@@ -2736,14 +2737,14 @@ def extendFit(fit = {}, x1 = None, x2 = None, n = None):
     Extends the fit result from Fit().
     """
     if not type(fit) is dict:
-        print(Fore.RED + 'Argument fit must be a dict from e.g. Fit() or similar method.' + Fore.BLACK); return fit
+        print(Fore.RED + 'Argument fit must be a dict from e.g. Fit() or similar method.' + Fore.RESET); return fit
     if not "method" in fit:
-        print(Fore.RED + 'Argument fit must contain a reference to the fit profile used.' + Fore.BLACK); return fit
+        print(Fore.RED + 'Argument fit must contain a reference to the fit profile used.' + Fore.RESET); return fit
     #
     xaxis = fit.get('x')
     y = fit.get('y')
     if type(xaxis) is type(None):
-        print(Fore.RED + 'Argument fit has no key x.' + Fore.BLACK); return fit
+        print(Fore.RED + 'Argument fit has no key x.' + Fore.RESET); return fit
     if type(x1) is type(None): x1 = xaxis[0]
     if type(x2) is type(None): x2 = xaxis[-1]
     if type(n) is type(None): n = len(xaxis)
@@ -2770,7 +2771,7 @@ def Fit(D = {}, profile = '', **kwargs):
                             gauss2, with argument p0 = [A1,mu1,A2,mu2,s,k,m]
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be of type grumpy dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be of type grumpy dict.' + Fore.RESET); return D
     profiles = ['gauss', 'gauss2']
     if profile == '':
         print('Pass argument profile as one of the following: {0}'.format(profiles))
@@ -2801,7 +2802,7 @@ def Fit(D = {}, profile = '', **kwargs):
         # add more profiles here
     
     else: # continue with 2d fits here
-        print(Fore.LIGHTRED_EX + "This method is currently only working for 1d data types." + Fore.BLACK)
+        print(Fore.LIGHTRED_EX + "This method is currently only working for 1d data types." + Fore.RESET)
 
 
 # ==============================================================================================
@@ -2820,7 +2821,7 @@ def removeSpikes(Y,threshold=2):
     Removes spikes from 1D or 2D intensity arrays.
     """
     if len(np.shape(Y)) > 2:
-        print(Fore.RED + "This works for 1d and 2d data."+ Fore.BLACK)
+        print(Fore.RED + "This works for 1d and 2d data."+ Fore.RESET)
         return Y
 
     if len(np.shape(Y)) == 1:
@@ -2873,7 +2874,7 @@ def removeSpikes2(Y,threshold=2):
     Removes spikes from 1D arrays.
     """
     if len(np.shape(Y)) > 1:
-        print(Fore.RED + "This works for 1d data."+ Fore.BLACK)
+        print(Fore.RED + "This works for 1d data."+ Fore.RESET)
         return Y
     #
     for i, y in enumerate(Y[:-4]):
@@ -2941,9 +2942,9 @@ def fwhm(x = [], y = [], x0 = None):
     else:
         try: x0 = float(x0)
         except:
-            print(Fore.RED + "Argument 'x0' must be a number (or None to be ignored)." + Fore.BLACK); return None, None
+            print(Fore.RED + "Argument 'x0' must be a number (or None to be ignored)." + Fore.RESET); return None, None
         if x0 < x.min() or x0 > x.max():
-            print(Fore.RED + f"Argument 'x0' must be in the range ({x.min()}, {x.max()})." + Fore.BLACK); return None, None
+            print(Fore.RED + f"Argument 'x0' must be in the range ({x.min()}, {x.max()})." + Fore.RESET); return None, None
         indx0 = abs(x - x0).argmin()
         hm = (y[indx0] - y.min())/2
     indx1 = abs(y[:indx0] - hm).argmin()
@@ -2969,9 +2970,9 @@ def Smooth(D = {}, method = '', **kwargs):
     Arguments for spin data: spin_key as 'int', 'int_on', or 'asymmetry'
     """
     if not type(D) is dict:
-        print(Fore.RED + 'Argument D must be a grumpy-type dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy-type dict.' + Fore.RESET); return D
     if D == {}:
-        print(Fore.RED + 'Argument D must be a grumpy-type dict.' + Fore.BLACK); return D
+        print(Fore.RED + 'Argument D must be a grumpy-type dict.' + Fore.RESET); return D
     #
     recognized_kwargs = ['size', 'mode', 'threshold', 'spin']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
@@ -2987,8 +2988,8 @@ def Smooth(D = {}, method = '', **kwargs):
         print("Note: argument method was not passed so using default method = 'median_filter'.")
         method = 'median_filter'
     if not method in methods:
-        msg = Fore.BLACK + ", ".join(m for m in methods)
-        print(Fore.RED + "Argument method must be one of: {0}.".format(msg) + Fore.BLACK)
+        msg = Fore.RESET + ", ".join(m for m in methods)
+        print(Fore.RED + "Argument method must be one of: {0}.".format(msg) + Fore.RESET)
         return D
     #
     INTKEY = ''
@@ -2998,8 +2999,8 @@ def Smooth(D = {}, method = '', **kwargs):
             print("Note: argument spin was not passed so using default spin = 'asymmetry'.")
             spin_key = 'asymmetry'
         if not spin_key in spin_keys:
-            msg = Fore.BLACK + ", ".join(m for m in methods)
-            print(Fore.RED + "Argument method must be one of: {0}.".format(msg) + Fore.BLACK)
+            msg = Fore.RESET + ", ".join(m for m in methods)
+            print(Fore.RED + "Argument method must be one of: {0}.".format(msg) + Fore.RESET)
             return D
         INTKEY = spin_key
     else:
@@ -3012,7 +3013,7 @@ def Smooth(D = {}, method = '', **kwargs):
         elif method == 'remove_spikes':
             Y = removeSpikes(D.get(INTKEY), threshold = rs_threshold)
     else:
-        print(Fore.RED + "This method is only accepting 1d and 2d data." + Fore.BLACK)
+        print(Fore.RED + "This method is only accepting 1d and 2d data." + Fore.RESET)
         return D
     #
     DD = copy.deepcopy(D)
@@ -3053,7 +3054,7 @@ class MakeArithmetic():
     def __init__(self, d = {}):
         """"""
         if not type(d) is dict:
-            print(Fore.RED + "Argument d must be a Grumpy dict." + Fore.BLACK)
+            print(Fore.RED + "Argument d must be a Grumpy dict." + Fore.RESET)
             return
         #
         dm = 0
@@ -3070,30 +3071,30 @@ class MakeArithmetic():
             self.z = axis
             dm += 1
         if dm == 0:
-            print(Fore.RED + "Did not find any axes in the dict." + Fore.BLACK)
+            print(Fore.RED + "Did not find any axes in the dict." + Fore.RESET)
         intensity = d.get("int", None)
         if type(intensity) is type(None):
-            print(Fore.RED + "Did not find an intensity array in the dict." + Fore.BLACK)
+            print(Fore.RED + "Did not find an intensity array in the dict." + Fore.RESET)
             return
         self.int = intensity
         if dm == 0: return
         #
         idim = len(np.shape(intensity))
         if not dm == idim:
-            print(Fore.RED + f"The number of axes ({dm}) does not match the dimension of the intensity array ({idim})." + Fore.BLACK)
+            print(Fore.RED + f"The number of axes ({dm}) does not match the dimension of the intensity array ({idim})." + Fore.RESET)
             return
         #
         if dm == 1:
             if not len(self.x) == np.shape(intensity)[0]:
-                print(Fore.RED + f"The length of the axis ({len(self.x)}) does not match the length of the intensity array ({np.shape(intensity)[0]})." + Fore.BLACK)
+                print(Fore.RED + f"The length of the axis ({len(self.x)}) does not match the length of the intensity array ({np.shape(intensity)[0]})." + Fore.RESET)
                 return
         elif dm == 2:
             if not len(self.x) == np.shape(intensity)[1] or not len(self.y) == np.shape(intensity)[0]:
-                print(Fore.RED + f"The lengths of the axes ({len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.BLACK)
+                print(Fore.RED + f"The lengths of the axes ({len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.RESET)
                 return
         elif dm == 3:
             if not len(self.x) == np.shape(intensity)[2] or not len(self.y) == np.shape(intensity)[1] or not len(self.z) == np.shape(intensity)[0]:
-                print(Fore.RED + f"The lengths of the axes ({len(self.z)},{len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.BLACK)
+                print(Fore.RED + f"The lengths of the axes ({len(self.z)},{len(self.y)}, {len(self.x)}) does not match the size of the intensity array ({np.shape(intensity)})." + Fore.RESET)
                 return
     
     # --------------- operators -----------------
@@ -3106,7 +3107,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret.int = ret.int + o
         else:
-            print(Fore.RED + "The + operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The + operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def __sub__(self, o):
@@ -3117,7 +3118,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret.int = ret.int - o
         else:
-            print(Fore.RED + "The - operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The - operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def __mul__(self, o):
@@ -3128,7 +3129,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret.int = ret.int * o
         else:
-            print(Fore.RED + "The * operator only acts on same type (element-wise), float, and int." + Fore.BLACK)
+            print(Fore.RED + "The * operator only acts on same type (element-wise), float, and int." + Fore.RESET)
         return ret
     
     def __truediv__(self, o):
@@ -3139,7 +3140,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret.int = ret.int / o
         else:
-            print(Fore.RED + "The / operator only acts on same type (element-wise), float, and int." + Fore.BLACK)
+            print(Fore.RED + "The / operator only acts on same type (element-wise), float, and int." + Fore.RESET)
         return ret
     
     def __lt__(self, o): # less than
@@ -3150,7 +3151,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret = self.int.sum() < o
         else:
-            print(Fore.RED + "The < operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The < operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def __gt__(self, o): # greater than
@@ -3161,7 +3162,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret = self.int.sum() > o
         else:
-            print(Fore.RED + "The > operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The > operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def __le__(self, o): # less or equal than
@@ -3172,7 +3173,7 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret = self.int.sum() <= o
         else:
-            print(Fore.RED + "The <= operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The <= operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def __ge__(self, o): # less or greater than
@@ -3183,17 +3184,17 @@ class MakeArithmetic():
         elif type(o) is int or type(o) is float:
             ret = self.int.sum() >= o
         else:
-            print(Fore.RED + "The >= operator only acts on same type, float, and int." + Fore.BLACK)
+            print(Fore.RED + "The >= operator only acts on same type, float, and int." + Fore.RESET)
         return ret
     
     def _check_other_object(self, o):
         try:
             oshape = np.shape(o.int)
         except:
-            print(Fore.RED + "The data in the 2nd object is of unknown type." + Fore.BLACK)
+            print(Fore.RED + "The data in the 2nd object is of unknown type." + Fore.RESET)
             return False
         if not oshape == np.shape(self.int):
-            print(Fore.RED + "The data in the objects are not of the same size and/or dimentsion." + Fore.BLACK)
+            print(Fore.RED + "The data in the objects are not of the same size and/or dimentsion." + Fore.RESET)
             return False
         return True
     
@@ -3203,13 +3204,13 @@ class MakeArithmetic():
         try:
             idim = len(np.shape(self.int))
         except:
-            print(Fore.RED + "There is no intensity data." + Fore.BLACK)
+            print(Fore.RED + "There is no intensity data." + Fore.RESET)
             return ax
         if idim == 0:
-            print(Fore.RED + "There is no intensity data." + Fore.BLACK)
+            print(Fore.RED + "There is no intensity data." + Fore.RESET)
             return ax
         if not idim in [1, 2]:
-            print(Fore.RED + "I'm not plotting data of higher dimension than 2." + Fore.BLACK)
+            print(Fore.RED + "I'm not plotting data of higher dimension than 2." + Fore.RESET)
             return ax
         #
         if type(ax) is type(None):
@@ -3259,9 +3260,9 @@ def Dict(D = {}, **kwargs):
     for key in list(D.keys()):
         item = D[key]
         if type(item) is dict:
-            print(Fore.GREEN + f"{key}" + "{" + Fore.BLACK)
+            print(Fore.GREEN + f"{key}" + "{" + Fore.RESET)
             Dict(item)
-            print(Fore.GREEN + '}' + Fore.BLACK)
+            print(Fore.GREEN + '}' + Fore.RESET)
         if type(item) is str:
             print("{0:<22}{1}".format(key, item))
         if type(item) is list:
@@ -3286,11 +3287,11 @@ def _kwarg_checker(key_list = [], **kwargs):
     """
     if len(key_list) == 0 or len(kwargs) == 0: return
     if kwargs.get('kw', False):
-        print(Fore.BLUE + 'Recognized **arguments: {0}'.format(", ".join(k for k in key_list)) + Fore.BLACK)
+        print(Fore.BLUE + 'Recognized **arguments: {0}'.format(", ".join(k for k in key_list)) + Fore.RESET)
     c = 0
     for kw in kwargs.keys():
         if not kw in key_list and not kw == 'kw':
-            print(Fore.RED + "Argument {0} is not recognized.".format(kw) + Fore.BLACK)
+            print(Fore.RED + "Argument {0} is not recognized.".format(kw) + Fore.RESET)
             c += 1
     if c > 0:
         print('Recognized **arguments: {0}'.format(", ".join(k for k in key_list)))
@@ -3400,11 +3401,11 @@ def AppendFEmaps(data1 = {}, data2 = {}, shup = False):
         if not shup:
             print(Fore.MAGENTA + "Note: is seems like the data in arg. data1 is starting at higher shift-x values")
             print("than the data in data2. This is not corrected for. Swap the argument unless you,")
-            print("for some reason, want it to be like this." + Fore.BLACK)
+            print("for some reason, want it to be like this." + Fore.RESET)
     if z1[-1] >= z2[0]:
         if not shup: 
             print(Fore.MAGENTA + "Note: is seems like there is an overlap of shift-x axis values. Use the")
-            print("SubArray() method to remedy this (if you want)."+ Fore.BLACK)
+            print("SubArray() method to remedy this (if you want)."+ Fore.RESET)
     #
     Z, int = [], []
     for i, z in enumerate(z1):
@@ -3431,37 +3432,37 @@ def AppendFEmaps(data1 = {}, data2 = {}, shup = False):
 
 def ExportSpinEDC(data = {}, exclude = []):
     if not type(data) is dict:
-        print(Fore.RED + "Argument data must be a grumpy dict" + Fore.BLACK)
+        print(Fore.RED + "Argument data must be a grumpy dict" + Fore.RESET)
         return
     #
     if not type(exclude) is list:
-        print(Fore.BLACK + "Argument exclude must be a list of integers. Ignoring this argument." + Fore.BLACK)
+        print(Fore.RESET + "Argument exclude must be a list of integers. Ignoring this argument." + Fore.RESET)
         exclude = []
     #
     if not data.get("Experiment", {}).get("Analyzer", "") == "PhoibosSpin":
-        print(Fore.RED + "The dicts does not contain spin data." + Fore.BLACK)
+        print(Fore.RED + "The dicts does not contain spin data." + Fore.RESET)
         return
     if not "NegativePolarity" in data.get("Parameters"):
-        print(Fore.RED + "Expected 'NegativePolarity' as a parameter but could not find it." + Fore.BLACK)
+        print(Fore.RED + "Expected 'NegativePolarity' as a parameter but could not find it." + Fore.RESET)
         return
     try:
         Parameter_values = data.get("Parameter_values", [])[0]
     except:
-        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.BLACK)
+        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.RESET)
         return
     if len(Parameter_values) == 0:
-        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.BLACK)
+        print(Fore.RED + "Missing parameter values for 'NegativePolarity'." + Fore.RESET)
         return
     #
     Data = data.get("Data", [])
     if not len(np.shape(Data)) == 3:
-        print(Fore.RED + "The data in the dict is not formatted as I would expect." + Fore.BLACK)
+        print(Fore.RED + "The data in the dict is not formatted as I would expect." + Fore.RESET)
         return
     #
     fidn = data.get("Experiment",{}).get("Spectrum_ID")
     try: fidn = int(fidn)
     except:
-        print(Fore.RED + "Could not find data spectrum ID" + Fore.BLACK)
+        print(Fore.RED + "Could not find data spectrum ID" + Fore.RESET)
         return
     #
     file_name = f"id{fidn}.dat"
@@ -3532,26 +3533,26 @@ def MergeSpinEDC(data1 = {}, data2 = {}):
     """
     """
     if not type(data1) is dict or not type(data2) is dict:
-        print(Fore.RED + f"Arguments data1 and data2 must be dicts." + Fore.BLACK)
+        print(Fore.RED + f"Arguments data1 and data2 must be dicts." + Fore.RESET)
         return {}
     #
     if data2 == {}: return data1
     #
     if not (data1.get("Measurement_type") == "spin_edc" and data2.get("Measurement_type") == "spin_edc"):
-        print(Fore.RED + f"Arguments data1 and data2 must be spin edc dicts." + Fore.BLACK)
+        print(Fore.RED + f"Arguments data1 and data2 must be spin edc dicts." + Fore.RESET)
         return {}
     #
     shp1, shp2 = np.shape(data1.get("Data")), np.shape(data2.get("Data"))
     if not (shp1[1] == shp2[1] and shp1[2] == shp2[2]):
-        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.BLACK)
+        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.RESET)
         return {}
     #
     if not(data1.get("Experiment", {}).get("Ep") == data2.get("Experiment", {}).get("Ep")):
-        print(Fore.RED + f"Arguments data1 and data2 have different pass energies." + Fore.BLACK)
+        print(Fore.RED + f"Arguments data1 and data2 have different pass energies." + Fore.RESET)
         return {}
     #
     if not(data1.get("Data")[0][0][0] == data2.get("Data")[0][0][0] and data1.get("Data")[0][0][-1] == data2.get("Data")[0][0][-1]):
-        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.BLACK)
+        print(Fore.RED + f"Arguments data1 and data2 must have the same energy axis." + Fore.RESET)
         return {}
     #
     File = deepcopy(data1.get("File", {}))
@@ -3776,16 +3777,16 @@ class MassageSpinEDC():
     """
     def __init__(self, data = {}):
         print(Fore.MAGENTA + "Note: I haven't been able to figure out how to make the decrease and increase buttons")
-        print("automatically update the graph. For now: update by sliding a slider forwards and backwards.\n" + Fore.BLACK)
+        print("automatically update the graph. For now: update by sliding a slider forwards and backwards.\n" + Fore.RESET)
         #
         print(Fore.BLUE + "Select curve, position the energy at a spike. Click the decrease and increase buttons")
-        print("to adjust. Use the result() method to get an updated data dict.\n" + Fore.BLACK)
+        print("to adjust. Use the result() method to get an updated data dict.\n" + Fore.RESET)
         try:
             mtype = data.get("Measurement_type", "")
         except:
-            print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.BLACK); return
+            print(Fore.RED + 'Argument data must be a grumpy dict.' + Fore.RESET); return
         if not mtype == "spin_edc":
-            print(Fore.RED + 'Argument data must be a grumpy dict containing spin edc data.' + Fore.BLACK); return
+            print(Fore.RED + 'Argument data must be a grumpy dict containing spin edc data.' + Fore.RESET); return
         #
         self.data = data
         self.Data = data.get("Data")
@@ -3921,7 +3922,7 @@ def Save(data = {}, file_name = "data.dat", **kwargs):
     
     # ----------------------- else
     else:
-        print(Fore.MAGENTA + "It appears that this kind of measurement data is not yet possible to save to file. Stay tuned for updates." + Fore.RESET)
+        print(Fore.MAGENTA + "It appears that I have not implemented a method for saving this type of data to file yet. Stay tuned for updates." + Fore.RESET)
 
 
 def SaveTargetScatteringSpectrum2File(data = {}, file_name = "data.dat"):
