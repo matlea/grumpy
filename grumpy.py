@@ -4017,7 +4017,7 @@ def SaveFermiMap2File(data = {}, file_name = "data.dat"):
     F[2].close()
     #
     for i in range(len(data.get("z"))):
-        F[3].write(f"# slice {i}, ShiftX = {data.get("z")[i]}\n")
+        F[3].write(f"# slice {i}, ShiftX = {data.get('z')[i]}\n")
         np.savetxt(F[3], data.get("int")[i,:,:].flatten(), fmt='%-.5e')
     F[3].close()
 
