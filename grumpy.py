@@ -91,6 +91,8 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 24.04.11.b  Polarization() is updated and works for spin edcs. Plot() is updated.
+
 Version 24.04.11    Made changes to Polarization(). Will have to do more chages but it works for spin edc.
                     Made changes so that asymmetry is not including the Sherman function (which was stupid in the first place).
                     Added a method Asymmetry() that accepts a spin_edc dict or two intensity arrays (Off and On). 
@@ -173,7 +175,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "24.04.11"
+__version__ = "24.04.11.b"
 __author__  = "Mats Leandersson"
 
 
@@ -1317,7 +1319,8 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
     
     # kwargs ----------
     recognized_kwargs = ['intensity', 'cmap', 'colorbar', 'vmin', 'vmax', 'rotate', 'aspect',
-                         'color', 'linewidth', 'linestyle', 'axvline', 'axhline', 'title', 'figsize']
+                         'color', 'linewidth', 'linestyle', 'axvline', 'axhline', 'title', 'figsize',
+                         'polarization', 'legend']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     kw_intensity = kwargs.get('intensity', '') 
@@ -1334,6 +1337,7 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
     kw_axvline = kwargs.get('axvline', [])
     kw_axhline = kwargs.get('axhline', [])
     kw_title = kwargs.get('title', '')
+    kw_legend = kwargs.get("legend", True)
     # -----------------
 
     # if this is a fit-result dict...
@@ -1350,10 +1354,26 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
     axes_in_D = _getAxes(D)
     if len(axes_in_D) == 1:
         if not hasattr(ax, 'plot'):
-            figsize = kwargs.get('figsize', (4, 2.5))
+            figsize = kwargs.get('figsize', (6, 3.5))
             fig, ax = plt.subplots(figsize = figsize)
 
-        if not Type.lower().startswith('spin'):
+        if Type.lower().startswith("polarization"):
+            kw_polarization = kwargs.get("polarization", True)
+            if kw_polarization:
+                ax.plot(D.get("x"), D.get("px"), label = "$P_x$", linewidth = 0.75)
+                ax.plot(D.get("x"), D.get("py"), label = "$P_y$", linewidth = 0.75)
+                ax.plot(D.get("x"), D.get("pz"), label = "$P_z$", linewidth = 0.75)
+            else:
+                ax.plot(D.get("x"), D.get("cx1"), label = "$P_{x+}$", linewidth = 0.85, color = "tab:blue")
+                ax.plot(D.get("x"), D.get("cx2"), label = "$P_{x-}$", linewidth = 0.70, color = "blue")
+                ax.plot(D.get("x"), D.get("cy1"), label = "$P_{y+}$", linewidth = 0.85, color = "tab:orange")
+                ax.plot(D.get("x"), D.get("cy2"), label = "$P_{y-}$", linewidth = 0.70, color = "orange")
+                ax.plot(D.get("x"), D.get("cz1"), label = "$P_{z+}$", linewidth = 0.85, color = "tab:red")
+                ax.plot(D.get("x"), D.get("cz2"), label = "$P_{z-}$", linewidth = 0.70, color = "red")
+            _ = ax.set_xlabel("Energy")
+            if kw_legend: ax.legend(fontsize = 9)
+
+        elif not Type.lower().startswith('spin'):
             ax.plot(D.get('x'), D.get('int'), linewidth = kw_linewidth, color = kw_color, linestyle = kw_linestyle)
             ax.set_xlabel(D.get('Meta',{}).get('x_label', ''))
             ax.set_ylabel(D.get('Meta',{}).get('int_label', ''))
@@ -1386,6 +1406,9 @@ def Plot(D = {}, ax = None, shup = False, **kwargs):
                 ax.set_ylabel('Asymmetry')
             ax.set_xlabel('Energy (eV)')
             ax.set_title('ID: {0}'.format(D.get('Experiment').get('Spectrum_ID')))
+        
+        
+
 
     # ----------------- plot 2d data 
     elif len(axes_in_D) == 2 and not Type.lower().startswith('spin'):
@@ -2402,13 +2425,14 @@ def Polarization(c2rp = {'Measurement_type': 'none'}, c2rm = {'Measurement_type'
     elif thecase == "edc_z":
         axis_size = np.zeros([len(c1.get("x"))])
         energy = c1.get("x")
-    Px = np.zeros([len(axis_size)])
-    Py, Pz = np.copy(Px), np.copy(Px)
-    Ac2rp, Ac2rm, Ac1 = np.copy(Px), np.copy(Px), np.copy(Px) 
+    zeros = np.zeros([len(axis_size)])
+    px, py, pz = np.copy(zeros), np.copy(zeros), np.copy(zeros)
+    Ac2rp, Ac2rm, Ac1 = np.copy(zeros), np.copy(zeros), np.copy(zeros) 
+    tot = np.copy(zeros)
+    cx1, cx2, cy1, cy2, cz1, cz2 = np.copy(zeros), np.copy(zeros), np.copy(zeros), np.copy(zeros), np.copy(zeros), np.copy(zeros) 
     #
     if thecase == "edc_xyz":
         Ac2rp, Ac2rm, Ac1 = Asymmetry(c2rp), Asymmetry(c2rm), Asymmetry(c1)
-
     elif thecase == "edc_xy":
         Ac2rp, Ac2rm = Asymmetry(c2rp), Asymmetry(c2rm)
     elif thecase == "edc_z":
@@ -2420,7 +2444,27 @@ def Polarization(c2rp = {'Measurement_type': 'none'}, c2rm = {'Measurement_type'
         pz =  1/SHERMAN * Ac1
         result = {"x": energy, "px": px, "py": py, "pz": pz}
         #
-    result.update({"type": "polarization"})
+        if thecase == "edc_xyz":
+            tot = (c2rp.get("int", zeros) + c2rp.get("int_on", zeros) + c2rm.get("int", zeros) + c2rm.get("int_on", zeros) + c1.get("int", zeros) + c1.get("int_on", zeros))/3
+            cx1 = tot/2 * (1 + px)
+            cx2 = tot/2 * (1 - px)
+            cy1 = tot/2 * (1 + py)
+            cy2 = tot/2 * (1 - py)
+            cz1 = tot/2 * (1 + pz)
+            cz2 = tot/2 * (1 - pz)
+        elif thecase == "edc_xy":
+            tot = (c2rp.get("int", zeros) + c2rp.get("int_on", zeros) + c2rm.get("int", zeros) + c2rm.get("int_on", zeros))/2
+            cx1 = tot/2 * (1 + px)
+            cx2 = tot/2 * (1 - px)
+            cy1 = tot/2 * (1 + py)
+            cy2 = tot/2 * (1 - py)   
+        elif thecase == "edc_z":
+            tot = (c1.get("int", zeros) + c1.get("int_on", zeros))/1
+            cz1 = tot/2 * (1 + pz)
+            cz2 = tot/2 * (1 - pz)
+    result.update({"tot": tot})
+    result.update({"cx1": cx1, "cx2": cx2, "cy1": cy1, "cy2": cy2, "cz1": cz1, "cz2": cz2})
+    result.update({"Type": "polarization"})
     return result
 
 
@@ -2470,7 +2514,7 @@ def Asymmetry(data = {}, Off = np.array([]), On = np.array([])):
 # ============================================================================================================
 # ============================================================================================================
 
-# not tested after re-write
+# This part is obsolete
 
 def _Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'none'}, D3 = {'Measurement_type': 'none'}, **kwargs):
     """
