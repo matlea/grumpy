@@ -91,6 +91,10 @@ Notes:
 
 Version history (from 23.05.15 and onwards):
 
+Version 24.04.11    Made changes to Polarization(). Will have to do more chages but it works for spin edc.
+                    Made changes so that asymmetry is not including the Sherman function (which was stupid in the first place).
+                    Added a method Asymmetry() that accepts a spin_edc dict or two intensity arrays (Off and On). 
+
 Version 24.03.18b   Added more save-to-file methods (SaveXPS2File() and SaveTargetScatteringSpectrum2File()) and included them in Save().
                     Changed all Fore.BLACK to Fore.RESET.
 
@@ -169,7 +173,7 @@ Version 23.05.15    Finished most of the re-writing of grumpy.py. The data forma
 
 """
 
-__version__ = "24.03.18"
+__version__ = "24.04.11"
 __author__  = "Mats Leandersson"
 
 
@@ -2158,21 +2162,21 @@ def QuickSpin(D = {}, **kwargs):
         else:
             asymmetry[i] = 0
     if plot:
-        ax[2].plot(energy, asymmetry / sherman, linewidth = linewidth, color = 'k')
-        ax[2].set_title(f'asymmetry (S = {sherman})')
+        ax[2].plot(energy, asymmetry, linewidth = linewidth, color = 'k')
+        ax[2].set_title('asymmetry')
     
-    P1 = (edc_off + edc_on) * (1 + asymmetry / sherman) * 0.5 # there must be a 0.5 here, right?
-    P2 = (edc_off + edc_on) * (1 - asymmetry / sherman) * 0.5
+    C1 = (edc_off + edc_on) * (1 + asymmetry) * 0.5 # there must be a 0.5 here, right?
+    C2 = (edc_off + edc_on) * (1 - asymmetry) * 0.5
     if plot:
-        ax[3].plot(energy, P1, color = 'tab:blue', label = 'P1', linewidth = linewidth, linestyle = linestyle)
-        ax[3].plot(energy, P2, color = 'tab:red', label = 'P2', linewidth = linewidth, linestyle = linestyle)
+        ax[3].plot(energy, C1, color = 'tab:blue', label = 'C1', linewidth = linewidth, linestyle = linestyle)
+        ax[3].plot(energy, C2, color = 'tab:red', label = 'C2', linewidth = linewidth, linestyle = linestyle)
         ax[3].legend()
-        ax[3].set_title('Components, S = {0}'.format(sherman))
+        ax[3].set_title('Components')
     
     DD = copy.deepcopy(D)
     DD.update({'int': edc_off})
     DD.update({'int_on': edc_on})
-    DD.update({'asymmetry': asymmetry/sherman})
+    DD.update({'asymmetry': asymmetry})
     return DD
 
 
@@ -2270,8 +2274,8 @@ def QuickSpinMDC(D = {}, **kwargs):
             else:
                 asymmetry[i] = 0
         #
-        P1 = (edc_off + edc_on) * (1 + asymmetry / sherman) * 0.5 # there must be a 0.5 here, right?
-        P2 = (edc_off + edc_on) * (1 - asymmetry / sherman) * 0.5
+        C1 = (edc_off + edc_on) * (1 + asymmetry) * 0.5 # there must be a 0.5 here, right?
+        C2 = (edc_off + edc_on) * (1 - asymmetry) * 0.5
         #
         if plot:
             if figsize == (0,0): figsize = (10,3)
@@ -2279,15 +2283,15 @@ def QuickSpinMDC(D = {}, **kwargs):
             ax[0].plot(defl_axis, edc_off, color = 'tab:blue', linewidth = linewidth, label = 'Off', linestyle = linestyle)
             ax[0].plot(defl_axis, edc_on, color = 'tab:red', linewidth = linewidth, label = 'On', linestyle = linestyle)
             ax[1].plot(defl_axis, asymmetry, color = 'k', linewidth = linewidth, label = 'Asymmetry', linestyle = linestyle)
-            ax[2].plot(defl_axis, P1, color = 'tab:blue', linewidth = linewidth, label = 'P1', linestyle = linestyle)
-            ax[2].plot(defl_axis, P2, color = 'tab:red', linewidth = linewidth, label = 'P2', linestyle = linestyle)
+            ax[2].plot(defl_axis, C1, color = 'tab:blue', linewidth = linewidth, label = 'C1', linestyle = linestyle)
+            ax[2].plot(defl_axis, C2, color = 'tab:red', linewidth = linewidth, label = 'C2', linestyle = linestyle)
             #
             if direction in ['x','y']:
                 xlabel = 'Deflection {0} (deg.)'.format(direction)
             else:
                 xlabel = 'Defl. ({0},{1}) to ({2},{3}) (deg.)'.format(defl_x[0], defl_y[0], defl_x[-1], defl_y[-1])
             #
-            for i, ttl in enumerate(['Intensity', 'Asymmetry', 'Intensity (S={0})'.format(sherman)]):
+            for i, ttl in enumerate(['Intensity', 'Asymmetry', 'Components']):
                 ax[i].set_title(ttl)
                 ax[i].set_xlabel(xlabel)
                 if i in [0,2]:
@@ -2301,7 +2305,7 @@ def QuickSpinMDC(D = {}, **kwargs):
         DD.update({'asymmetry': asymmetry})
         
     else:
-        off_map, on_map, asym_map, p1_map, p2_map = [], [], [], [], []
+        off_map, on_map, asym_map, c1_map, c2_map = [], [], [], [], []
         for i in range(len(asym)):
             edc_off_f = edc_off[i]
             edc_on_f  = edc_on[i]
@@ -2317,9 +2321,9 @@ def QuickSpinMDC(D = {}, **kwargs):
             off_map.append(edc_off_f)
             on_map.append(edc_on_f)
             asym_map.append(asymmetry)
-            p1_map.append(p1)
-            p2_map.append(p2)
-        off_map, on_map, asym_map, p1_map, p2_map = np.array(off_map), np.array(on_map), np.array(asym_map), np.array(p1_map), np.array(p2_map)
+            c1_map.append(p1)
+            c2_map.append(p2)
+        off_map, on_map, asym_map, c1_map, c2_map = np.array(off_map), np.array(on_map), np.array(asym_map), np.array(c1_map), np.array(c2_map)
         #
         if plot:
             if figsize == (0,0): figsize = (11,7)
@@ -2331,9 +2335,9 @@ def QuickSpinMDC(D = {}, **kwargs):
             IMS.append( ax[0].imshow(off_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
             IMS.append( ax[1].imshow(on_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
             IMS.append( ax[2].imshow(asym_map, extent = extent, aspect = 'auto', vmin = vmina, vmax = vmaxa, cmap = cmap) )
-            IMS.append( ax[3].imshow(p1_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            IMS.append( ax[4].imshow(p2_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            ttls = ['Intensity Off', 'Intensity On', 'Asymmetry', 'Intensity S={0}'.format(sherman), 'Intensity S={0}'.format(sherman)]
+            IMS.append( ax[3].imshow(c1_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
+            IMS.append( ax[4].imshow(c2_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
+            ttls = ['Intensity Off', 'Intensity On', 'Asymmetry', 'Intensity S={0}'.format(sherman), 'Components']
             for i, ttl in enumerate(ttls):
                 ax[i].set_title(ttl) 
                 if colorbar: fig.colorbar(IMS[i], ax = ax[i])
@@ -2350,6 +2354,112 @@ def QuickSpinMDC(D = {}, **kwargs):
         
 
 
+# ============================================================================================================
+# ============================================================================================================
+# ============================================================================================================
+# ============================================================================================================
+
+def Polarization(c2rp = {'Measurement_type': 'none'}, c2rm = {'Measurement_type': 'none'}, c1 = {'Measurement_type': 'none'}, **kwargs):
+    """
+    Arguments: c2rp, c2rm, c1
+    """
+    recognized_kwargs = ['SF', 'plot', 'figsize', 'cmap', 'vmin', 'vmax']
+    _kwarg_checker(key_list = recognized_kwargs, **kwargs)
+    global SHERMAN
+    SF = kwargs.get('sherman', SHERMAN)
+    plot = kwargs.get('plot', True)
+    figsize = kwargs.get('figsize', (8,3))
+    cmap = kwargs.get('cmap', 'rainbow')
+    vmin = kwargs.get('vmin', None)
+    vmax = kwargs.get('vmax', None)
+    #
+    if not (type(c2rp) is dict and type(c2rm) is dict and type(c1) is dict):
+        print(Fore.RED + 'Arguments c2rp, c2rm, and c1 must (if passed) be grumpy dicts.' + Fore.RESET)
+        return {}
+    #
+    if (c2rp["Measurement_type"] == "spin_edc" and c2rm["Measurement_type"] == "spin_edc" and c1["Measurement_type"] == "spin_edc"):
+        thecase = "edc_xyz"
+    elif (c2rp["Measurement_type"] == "spin_edc" and c2rm["Measurement_type"] == "spin_edc" and not c1["Measurement_type"] == "spin_edc"):
+        thecase = "edc_xy"
+    elif (not c2rp["Measurement_type"] == "spin_edc" and not c2rm["Measurement_type"] == "spin_edc" and c1["Measurement_type"] == "spin_edc"):
+        thecase = "edc_z"
+    else:
+        print(Fore.MAGENTA + "At the moment this only works for spin edcs." + Fore.RESET)
+        return {}
+    #
+    if thecase == "edc_xyz":
+        if not( len(c2rp.get("x", np.array([]))) == len(c2rm.get("x", np.array([]))) and len(c2rp.get("x", np.array([]))) == len(c1.get("x", np.array([]))) ):
+            print(Fore.MAGENTA + "This is a mixed set of data sizes. Can not handle that." + Fore.RESET)
+            return {}
+        axis_size = np.zeros([len(c2rp.get("x"))])
+        energy = c2rp.get("x")
+    elif thecase == "edc_xy":
+        if not len(c2rp.get("x", np.array([]))) == len(c2rm.get("x", np.array([]))):
+            print(Fore.MAGENTA + "This is a mixed set of data sizes. Can not handle that." + Fore.RESET)
+            return {}
+        axis_size = np.zeros([len(c2rp.get("x"))])
+        energy = c2rp.get("x")
+    elif thecase == "edc_z":
+        axis_size = np.zeros([len(c1.get("x"))])
+        energy = c1.get("x")
+    Px = np.zeros([len(axis_size)])
+    Py, Pz = np.copy(Px), np.copy(Px)
+    Ac2rp, Ac2rm, Ac1 = np.copy(Px), np.copy(Px), np.copy(Px) 
+    #
+    if thecase == "edc_xyz":
+        Ac2rp, Ac2rm, Ac1 = Asymmetry(c2rp), Asymmetry(c2rm), Asymmetry(c1)
+
+    elif thecase == "edc_xy":
+        Ac2rp, Ac2rm = Asymmetry(c2rp), Asymmetry(c2rm)
+    elif thecase == "edc_z":
+        Ac1 = Asymmetry(c1)
+    #
+    if thecase.startswith("edc"):
+        px =  1/(np.sqrt(2) * SHERMAN) * (Ac2rp - Ac2rm)
+        py = -1/(np.sqrt(2) * SHERMAN) * (Ac2rp + Ac2rm)
+        pz =  1/SHERMAN * Ac1
+        result = {"x": energy, "px": px, "py": py, "pz": pz}
+        #
+    result.update({"type": "polarization"})
+    return result
+
+
+
+def Asymmetry(data = {}, Off = np.array([]), On = np.array([])):
+    """
+    """
+    if not type(data) is dict:
+        print(Fore.RED + 'If you pass the argument data it must be a grumpy dict.' + Fore.RESET)
+        return {}
+    if not (type(Off) is np.ndarray and type(On) is np.ndarray):
+        print(Fore.RED + 'If you pass arguments Off and On they must be a numpy arrays.' + Fore.RESET)
+        return {}
+    #
+    if data.get("Measurement_type", "") == "spin_edc":
+        thecase = "dict"
+    elif len(Off) > 0 and len(Off) == len(On):
+        thecase = "arrays"
+    else:
+        print(Fore.RED + 'You need to pass a spin_edc dict (argument data) or two intensity curved (Off and On).' + Fore.RESET)
+        return {}
+    #
+    if thecase == "dict":
+        Off, On = data.get("int"), data.get("int_on")
+    #
+    asymmetry = np.zeros([len(Off)])
+    for i in range(len(Off)):
+        denom = (Off[i] + On[i])
+        if not denom == 0:
+            nom = (Off[i] - On[i])
+            asymmetry[i] = (nom/denom)
+        else:
+            asymmetry[i] = 0
+    #
+    return asymmetry
+    
+
+        
+
 
 
 
@@ -2362,7 +2472,7 @@ def QuickSpinMDC(D = {}, **kwargs):
 
 # not tested after re-write
 
-def Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'none'}, D3 = {'Measurement_type': 'none'}, **kwargs):
+def _Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'none'}, D3 = {'Measurement_type': 'none'}, **kwargs):
     """
     Calculates Px, Py, and Pz from three measurements, Px and Py from two measurements, or Pz from one,
     given that the measurements are from the correct coil and rotor combinations.
@@ -2380,7 +2490,7 @@ def Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'n
     global SHERMAN
     SF = kwargs.get('sherman', SHERMAN)
     plot = kwargs.get('plot', True)
-    figsize = kwargs.get('figsize', (4,3))
+    figsize = kwargs.get('figsize', (8,3))
     cmap = kwargs.get('cmap', 'rainbow')
     vmin = kwargs.get('vmin', None)
     vmax = kwargs.get('vmax', None)
@@ -2419,30 +2529,56 @@ def Polarization(D1 = {'Measurement_type': 'none'}, D2 = {'Measurement_type': 'n
     
     #
     results = {}
-    Px, Py, Pz = None, None, None
+    Px = Py = Pz = tot = np.zeros(len(D[0].get('x')))
     # SPIN_EDC (w/o deflectors)
     if any(x=='spin_edc' for x in types):
-        if plot: fig, ax = plt.subplots(figsize = figsize)
+        if plot: fig, ax = plt.subplots(ncols = 2, figsize = figsize)
         if Case == 'Pxyz' or Case == 'Pxy':
             Px, Py = _polarization_xy(D[0]['asymmetry'], D[1]['asymmetry'], SF)
-        elif Case == 'Pxyz' or Case == 'Pz':
+            tot += ((D[0]["int"] + D[0]["int_on"])/2 + (D[1]["int"] + D[1]["int_on"])/2)/2
+        if Case == 'Pxyz' or Case == 'Pz':
             Pz = _polarization_z(D[2]['asymmetry'], SF)
+            tot += (D[2]["int"] + D[2]["int_on"])/2
         else:
             pass
         results.update({'energy': D[0].get('x')})
-        if not type(Px) is type(None):
-            results.update({'px': Px})
-            if plot: ax.plot(results['energy'], Px, label = 'Px')
-        if not type(Py) is type(None):
-            results.update({'py': Py})
-            if plot: ax.plot(results['energy'], Py, label = 'Py')
-        if not type(Pz) is type(None):
-            results.update({'pz': Pz})
-            if plot: ax.plot(results['energy'], Pz, label = 'Pz')
+        results.update({'px': Px})
+        results.update({'py': Py})
+        results.update({'pz': Pz})
+
+        cx1 = tot/2 * (1 + Px)
+        cx2 = tot/2 * (1 - Px)
+        cy1 = tot/2 * (1 + Py)
+        cy2 = tot/2 * (1 - Py)
+        cz1 = tot/2 * (1 + Pz)
+        cz2 = tot/2 * (1 - Pz)
+        results.update({"cx1": cx1, "cx2": cx2, "cy1": cy1, "cy2": cy2, "cz1": cz1, "cz2": cz2})
+
+
+        #if not type(Px) is type(None):
+        #    results.update({'px': Px})
+        #    if plot: ax.plot(results['energy'], Px, label = 'Px')
+        #if not type(Py) is type(None):
+        #    results.update({'py': Py})
+        #    if plot: ax.plot(results['energy'], Py, label = 'Py')
+        #if not type(Pz) is type(None):
+        #    results.update({'pz': Pz})
+        #    if plot: ax.plot(results['energy'], Pz, label = 'Pz')
         if plot:
-            ax.set_xlabel(D[0].get('Meta',{}).get('x_label'))
-            ax.set_ylabel('Polarization')
-            ax.legend()
+            ax[0].plot(results['energy'], Px, label = 'Px')
+            ax[0].plot(results['energy'], Py, label = 'Py')
+            ax[0].plot(results['energy'], Pz, label = 'Pz')
+            ax[0].set_xlabel(D[0].get('Meta',{}).get('x_label'))
+            ax[0].set_ylabel('Polarization')
+            ax[0].legend()
+            ax[1].plot(results['energy'], cx1, label = "$C_{x1}$")
+            ax[1].plot(results['energy'], cx2, label = "$C_{x2}$")
+            ax[1].plot(results['energy'], cy1, label = "$C_{y1}$")
+            ax[1].plot(results['energy'], cy2, label = "$C_{y2}$")
+            ax[1].plot(results['energy'], cz1, label = "$C_{z1}$")
+            ax[1].plot(results['energy'], cz2, label = "$C_{z2}$")
+            ax[1].set_xlabel(D[0].get('Meta',{}).get('x_label'))
+
     # spin with deflectors
     else:
         # sort out which deflectors were used
@@ -2556,8 +2692,12 @@ def _polarization_xy(a_c1rp = None, a_c1rn = None, sf = None):
     if type(sf) is type(None):
         global SHERMAN
         sf = SHERMAN
-    px = np.sqrt(2)/(2*sf)*(a_c1rp - a_c1rn)
-    py = -np.sqrt(2)/(2*sf)*(a_c1rp + a_c1rn)
+    #px = np.sqrt(2)/(2*sf)*(a_c1rp - a_c1rn)
+    #py = -np.sqrt(2)/(2*sf)*(a_c1rp + a_c1rn)
+    print(a_c1rp)
+    px = 1/np.sqrt(2) * (a_c1rp - a_c1rn)
+    py = -1/np.sqrt(2) * (a_c1rp + a_c1rn)
+
     return px, py
 
 def _polarization_z(a_c2 = None, sf = None):
