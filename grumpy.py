@@ -111,7 +111,7 @@ Version 24.03.15    Added new kwargs to QuickSpin. Normalize the edc's to each o
 
 Version 24.01.24    Added 'Analyer CCD' as a recognized alternative to 'PhoibosCCD'. 'Analyzer CCD' was added to our Prodigy installation
                     during Robert's visit in January (2024).
-                    NOTE: Add 'Analyzer Intensity' and 'Analyzer Spin' as well a.s.a.p. 
+                    Note: Add 'Analyzer Intensity' and 'Analyzer Spin' as well a.s.a.p. 
 
 Version 23.12.16    Updated SpinEDC().
                     Updated MassageSpinEDC() (added some time ago but failed to update history then)
