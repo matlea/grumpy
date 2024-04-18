@@ -2227,8 +2227,8 @@ def QuickSpinMDC(D = {}, **kwargs):
         print(Fore.RED + 'The dicts does not contain deflector spin data.' + Fore.RESET); return D
     #
     recognized_kwargs = ['plot', 'shup', 'median_filter_edc', 'size', 'mode', 'remove_spikes', 'filter_outliers',
-                        'threshold', 'sherman', 'figsize', 'linewidth', 'linestyle', 'vmin', 'vmax', 'vmina',
-                        'vmaxa', 'cmap', 'colorbar', 'median_filter']
+                        'threshold', 'figsize', 'linewidth', 'linestyle', 'vmin', 'vmax', 'vmina',
+                        'vmaxa', 'cmap', 'colorbar', 'median_filter', 'asym_shift']
     _kwarg_checker(key_list = recognized_kwargs, **kwargs)
 
     plot = kwargs.get('plot', True)
@@ -2240,9 +2240,10 @@ def QuickSpinMDC(D = {}, **kwargs):
     if type(remove_spikes) is type(None):
         remove_spikes = kwargs.get('filter_outliers', False)
     threshold = kwargs.get('threshold', 2)
+    asym_shift = kwargs.get("asym_shift", 0)
     
-    global SHERMAN
-    sherman = kwargs.get('sherman', SHERMAN)
+    #global SHERMAN
+    #sherman = kwargs.get('sherman', SHERMAN)
     figsize = kwargs.get('figsize', (0,0))
     linewidth = kwargs.get('linewidth', 0.75)
     linestyle = kwargs.get('linestyle', '-')
@@ -2339,34 +2340,39 @@ def QuickSpinMDC(D = {}, **kwargs):
                 edc_off_f = medianFilter(edc_off_f, size = size, mode = mode)
                 edc_on_f =  medianFilter(edc_on_f, size = size, mode = mode)
             asymmetry = (edc_off_f - edc_on_f) / (edc_off_f + edc_on_f)
-            p1 = (edc_off_f + edc_on_f) * (1 + asymmetry / sherman) * 0.5 # there must be a 0.5 here, right?
-            p2 = (edc_off_f + edc_on_f) * (1 - asymmetry / sherman) * 0.5
+            c1 = (edc_off_f + edc_on_f) * (1 + asymmetry) * 0.5 # there must be a 0.5 here, right?
+            c2 = (edc_off_f + edc_on_f) * (1 - asymmetry) * 0.5
             off_map.append(edc_off_f)
             on_map.append(edc_on_f)
             asym_map.append(asymmetry)
-            c1_map.append(p1)
-            c2_map.append(p2)
+            c1_map.append(c1)
+            c2_map.append(c2)
         off_map, on_map, asym_map, c1_map, c2_map = np.array(off_map), np.array(on_map), np.array(asym_map), np.array(c1_map), np.array(c2_map)
         #
         if plot:
-            if figsize == (0,0): figsize = (11,7)
-            fig, ax = plt.subplots(nrows = 2, ncols = 3, figsize = figsize)
-            ax = ax.flatten()
-            ax[5].remove()
+            if figsize == (0,0): figsize = (14,3)
+            fig, ax = plt.subplots(ncols = 5, figsize = figsize)
             extent = [energy[0], energy[-1], defl_axis[-1], defl_axis[0]]
+            #
+            vmin01, vmax01 = np.min([off_map.min(), on_map.min()]), np.max([off_map.max(), on_map.max()])
+            vmin34, vmax34 = np.min([c1_map.min(), c2_map.min()]), np.max([c1_map.max(), c2_map.max()])
+            #
+            vmin2, vmax2 = asym_map.min(), asym_map.max()
+            #
             IMS = []
-            IMS.append( ax[0].imshow(off_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            IMS.append( ax[1].imshow(on_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            IMS.append( ax[2].imshow(asym_map, extent = extent, aspect = 'auto', vmin = vmina, vmax = vmaxa, cmap = cmap) )
-            IMS.append( ax[3].imshow(c1_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            IMS.append( ax[4].imshow(c2_map, extent = extent, aspect = 'auto', vmin = vmin, vmax = vmax, cmap = cmap) )
-            ttls = ['Intensity Off', 'Intensity On', 'Asymmetry', 'Intensity S={0}'.format(sherman), 'Components']
+            IMS.append( ax[0].imshow(off_map, extent = extent, aspect = 'auto', vmin = vmin01, vmax = vmax01, cmap = cmap) )
+            IMS.append( ax[1].imshow(on_map, extent = extent, aspect = 'auto', vmin = vmin01, vmax = vmax01, cmap = cmap) )
+            IMS.append( ax[2].imshow(asym_map+asym_shift, extent = extent, aspect = 'auto', vmin = vmin2, vmax = vmax2, cmap = "bwr") )
+            IMS.append( ax[3].imshow(c1_map, extent = extent, aspect = 'auto', vmin = vmin34, vmax = vmax34, cmap = cmap) )
+            IMS.append( ax[4].imshow(c2_map, extent = extent, aspect = 'auto', vmin = vmin34, vmax = vmax34, cmap = cmap) )
+            ttls = ['Intensity Off', 'Intensity On', 'Asymmetry', 'Component Off', 'Component On']
             for i, ttl in enumerate(ttls):
                 ax[i].set_title(ttl) 
                 if colorbar: fig.colorbar(IMS[i], ax = ax[i])
-                if i in [2,3,4]: ax[i].set_xlabel('Energy (eV)')
-                if i in [0,3]: ax[i].set_ylabel('Deflection')
+                ax[i].set_xlabel('Energy (eV)')
                 ax[i].invert_yaxis()
+            ax[0].set_ylabel('Deflection')
+            fig.tight_layout()
         DD = copy.deepcopy(D)
         DD.update({'int': off_map})
         DD.update({'int_on': on_map})
